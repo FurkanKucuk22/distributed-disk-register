@@ -9,6 +9,16 @@ public class SetCommand implements Command {
         this.key = key;
         this.value = value;
     }
+    
+    // --- EKLENEN GETTER METODLARI ---
+    public String getKey() {
+        return key;
+    }
+
+    public String getValue() {
+        return value;
+    }
+    // --------------------------------
 
     @Override
     public String execute(DataStore store) {

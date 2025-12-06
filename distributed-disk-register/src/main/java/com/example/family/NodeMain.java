@@ -1,35 +1,45 @@
 package com.example.family;
 
-import family.Empty;
-import family.FamilyServiceGrpc;
-import family.FamilyView;
-import family.NodeInfo;
-import family.ChatMessage;
-
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.Socket;
-
-import java.io.IOException;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.example.family.SetGetCommand.Command;
 import com.example.family.SetGetCommand.CommandParser;
 import com.example.family.SetGetCommand.DataStore;
 
+import family.ChatMessage;
+import family.Empty;
+import family.FamilyServiceGrpc;
+import family.FamilyView;
+import family.NodeInfo;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.FileReader;
+import java.io.BufferedWriter;
+import java.io.BufferedReader;
+
+import com.example.family.SetGetCommand.SetCommand;
+import com.example.family.SetGetCommand.GetCommand;
+
 public class NodeMain {
 
     private static final int START_PORT = 5555;
     private static final int PRINT_INTERVAL_SECONDS = 10;
-    // 🆕 SET/GET verilerini tuttuğumuz Map
+    //  SET/GET verilerini tuttuğumuz Map
     private static final DataStore STORE = new DataStore();
 
     public static void main(String[] args) throws Exception {
@@ -93,26 +103,44 @@ public class NodeMain {
             String line;
             while ((line = reader.readLine()) != null) {
                 String text = line.trim();
-                if (text.isEmpty())
+                if (text.isEmpty()) {
                     continue;
+                }
 
                 // Kendi üstüne de yaz
-                System.out.println("📝 Received from TCP: " + text);
+                System.out.println(" Received from TCP: " + text);
 
                 try {
-                    // 🔹 1) Komutu parse et
+                    //  1) Komutu parse et
                     Command cmd = CommandParser.parse(text);
 
-                    // 🔹 2) SET / GET'i DataStore üzerinde çalıştır
-                    String result = cmd.execute(STORE);
+                    String result;
 
-                    // 🔹 3) Sonucu istemciye gönder
-                    System.out.println("Dönen Cevap: " + result); // Örn: "OK" veya "NOT_FOUND" veya value
+                    if (cmd instanceof SetCommand setCmd) {
+                        // Memory'e yaz
+                        STORE.set(setCmd.getKey(), setCmd.getValue());
 
+                        // Disk'e yaz
+                        writeMessageToDisk(setCmd.getKey(), setCmd.getValue());
+
+                        result = "OK";
+
+                    } else if (cmd instanceof GetCommand getCmd) {
+                        // Diskten oku
+                        String value = readMessageFromDisk(getCmd.getKey());
+
+                        if (value == null) {
+                            result = "NOT_FOUND";
+                        } else {
+                            result = value;
+                        }
+
+                    } else {
+                        result = "ERROR: Unknown command";
+                    }
                     // Client'a cevabı yolluyoruz
                     PrintWriter writer = new PrintWriter(client.getOutputStream(), true);
-                    writer.println(result);  
-
+                    writer.println(result);
 
                     long ts = System.currentTimeMillis();
                     ChatMessage msg = ChatMessage.newBuilder()
@@ -171,8 +199,9 @@ public class NodeMain {
                 System.err.printf("Failed to send to %s:%d (%s)%n",
                         n.getHost(), n.getPort(), e.getMessage());
             } finally {
-                if (channel != null)
+                if (channel != null) {
                     channel.shutdownNow();
+                }
             }
         }
     }
@@ -211,8 +240,9 @@ public class NodeMain {
 
             } catch (Exception ignored) {
             } finally {
-                if (channel != null)
+                if (channel != null) {
                     channel.shutdownNow();
+                }
             }
         }
     }
@@ -275,7 +305,36 @@ public class NodeMain {
                 }
             }
 
-        }, 5, 10, TimeUnit.SECONDS); // 5 sn sonra başla, 10 sn'de bir kontrol et
+        }, 5, 10, TimeUnit.SECONDS); // 5 sn sonra başla, 10 sn'de bir kontrol et      
+    }
+    private static final File MESSAGE_DIR = new File("messages");
+
+    static {
+        if (!MESSAGE_DIR.exists()) {
+            MESSAGE_DIR.mkdirs();
+        }
     }
 
+    private static void writeMessageToDisk(String id, String msg) {
+        File file = new File(MESSAGE_DIR, id + ".msg");
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+            bw.write(msg);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static String readMessageFromDisk(String id) {
+        File file = new File(MESSAGE_DIR, id + ".msg");
+        if (!file.exists()) {
+            return null;
+        }
+
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            return br.readLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 }

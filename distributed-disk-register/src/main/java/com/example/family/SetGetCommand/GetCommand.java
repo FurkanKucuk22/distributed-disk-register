@@ -8,6 +8,12 @@ public class GetCommand implements Command {
         this.key = key;
     }
 
+// --- EKLENEN GETTER METODU ---
+    public String getKey() {
+        return key;
+    }
+    // -----------------------------
+
     @Override
     public String execute(DataStore store) {
         return store.get(key);
