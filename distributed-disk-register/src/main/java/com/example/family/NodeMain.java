@@ -30,7 +30,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.FileReader;
 import java.io.BufferedWriter;
-import java.io.BufferedReader;
 
 import com.example.family.SetGetCommand.SetCommand;
 import com.example.family.SetGetCommand.GetCommand;
@@ -39,7 +38,7 @@ public class NodeMain {
 
     private static final int START_PORT = 5555;
     private static final int PRINT_INTERVAL_SECONDS = 10;
-    //  SET/GET verilerini tuttuğumuz Map
+    // SET/GET verilerini tuttuğumuz Map
     private static final DataStore STORE = new DataStore();
 
     public static void main(String[] args) throws Exception {
@@ -54,9 +53,12 @@ public class NodeMain {
         NodeRegistry registry = new NodeRegistry();
         FamilyServiceImpl service = new FamilyServiceImpl(registry, self);
 
+        StorageServiceImpl storageService = new StorageServiceImpl(STORE);
+
         Server server = ServerBuilder
                 .forPort(port)
                 .addService(service)
+                .addService(storageService)
                 .build()
                 .start();
 
@@ -111,7 +113,7 @@ public class NodeMain {
                 System.out.println(" Received from TCP: " + text);
 
                 try {
-                    //  1) Komutu parse et
+                    // 1) Komutu parse et
                     Command cmd = CommandParser.parse(text);
 
                     String result;
@@ -233,7 +235,7 @@ public class NodeMain {
                 FamilyServiceGrpc.FamilyServiceBlockingStub stub = FamilyServiceGrpc.newBlockingStub(channel);
 
                 // Karşılıklı tanışma
-                FamilyView view = stub.join(self); 
+                FamilyView view = stub.join(self);
                 registry.addAll(view.getMembersList());
 
                 System.out.printf("Joined through %s:%d, family size now: %d%n",
@@ -306,8 +308,9 @@ public class NodeMain {
                 }
             }
 
-        }, 5, 10, TimeUnit.SECONDS); // 5 sn sonra başla, 10 sn'de bir kontrol et      
+        }, 5, 10, TimeUnit.SECONDS); // 5 sn sonra başla, 10 sn'de bir kontrol et
     }
+
     private static final File MESSAGE_DIR = new File("messages");
 
     static {
@@ -316,7 +319,7 @@ public class NodeMain {
         }
     }
 
-    private static void writeMessageToDisk(String id, String msg) {
+    private static void writeMessageToDisk(int id, String msg) { // String id -> int id
         File file = new File(MESSAGE_DIR, id + ".msg");
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
             bw.write(msg);
@@ -325,7 +328,7 @@ public class NodeMain {
         }
     }
 
-    private static String readMessageFromDisk(String id) {
+    private static String readMessageFromDisk(int id) { // String id -> int id
         File file = new File(MESSAGE_DIR, id + ".msg");
         if (!file.exists()) {
             return null;

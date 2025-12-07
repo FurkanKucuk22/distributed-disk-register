@@ -1,29 +1,30 @@
 package com.example.family.SetGetCommand;
 
+import family.StoredMessage;
+
 public class SetCommand implements Command {
 
-    private final String key;
-    private final String value;
+    private final StoredMessage message;
 
     public SetCommand(String key, String value) {
-        this.key = key;
-        this.value = value;
+        this.message = StoredMessage.newBuilder()
+                                    .setId(Integer.parseInt(key))
+                                    .setText(value)
+                                    .build();
     }
-    
+
     // --- EKLENEN GETTER METODLARI ---
-    public String getKey() {
-        return key;
+    public int getKey() {
+        return message.getId();
     }
 
     public String getValue() {
-        return value;
+        return message.getText();
     }
     // --------------------------------
 
     @Override
     public String execute(DataStore store) {
-        return store.set(key, value);
+        return store.set(message.getId(), message.getText());
     }
 }
-
-
