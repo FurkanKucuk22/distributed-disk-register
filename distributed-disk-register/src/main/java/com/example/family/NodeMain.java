@@ -12,6 +12,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.w3c.dom.Node;
+
 import com.example.family.SetGetCommand.Command;
 import com.example.family.SetGetCommand.CommandParser;
 import com.example.family.SetGetCommand.DataStore;
@@ -39,7 +41,7 @@ public class NodeMain {
 
     private static final int START_PORT = 5555;
     private static final int PRINT_INTERVAL_SECONDS = 10;
-    //  SET/GET verilerini tuttuğumuz Map
+    // SET/GET verilerini tuttuğumuz Map
     private static final DataStore STORE = new DataStore();
 
     public static void main(String[] args) throws Exception {
@@ -56,7 +58,8 @@ public class NodeMain {
 
         Server server = ServerBuilder
                 .forPort(port)
-                .addService(service)
+                .addService(service)                        // Node keşfi, join olma, chat mesajları, health check
+                .addService(new StorageServiceImpl(STORE))  // Mesaj kaydetme, mesaj okuma, disk-tabanlı veri depolama
                 .build()
                 .start();
 
@@ -111,7 +114,7 @@ public class NodeMain {
                 System.out.println(" Received from TCP: " + text);
 
                 try {
-                    //  1) Komutu parse et
+                    // 1) Komutu parse et
                     Command cmd = CommandParser.parse(text);
 
                     String result;
@@ -305,8 +308,9 @@ public class NodeMain {
                 }
             }
 
-        }, 5, 10, TimeUnit.SECONDS); // 5 sn sonra başla, 10 sn'de bir kontrol et      
+        }, 5, 10, TimeUnit.SECONDS); // 5 sn sonra başla, 10 sn'de bir kontrol et
     }
+
     private static final File MESSAGE_DIR = new File("messages");
 
     static {
