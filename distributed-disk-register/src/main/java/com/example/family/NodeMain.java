@@ -12,6 +12,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.Socket;
 
 
@@ -21,16 +22,20 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.*;
 
+
+interface Command {}
+
 public class NodeMain {
 
     private static final int START_PORT = 5555;
     private static final int PRINT_INTERVAL_SECONDS = 10;
+    private static final ConcurrentHashMap<String, String> map = new ConcurrentHashMap<>();
 
     public static void main(String[] args) throws Exception {
         String host = "127.0.0.1";
-        int port = findFreePort(START_PORT);
+        int port = findFreePort(START_PORT); // 5555 ve sonrası için boş olan ilk portu verir
 
-        NodeInfo self = NodeInfo.newBuilder()
+        NodeInfo self = NodeInfo.newBuilder() // Üyenin kendisi
                 .setHost(host)
                 .setPort(port)
                 .build();
@@ -83,14 +88,42 @@ public class NodeMain {
 private static void handleClientTextConnection(Socket client,
                                                NodeRegistry registry,
                                                NodeInfo self) {
-    System.out.println("New TCP client connected: " + client.getRemoteSocketAddress());
-    try (BufferedReader reader = new BufferedReader(
-            new InputStreamReader(client.getInputStream()))) {
+    System.out.println("New TCP client connected: " + client.getRemoteSocketAddress()); // Bağlanan kişinin adresi ekrana yazılır.
+    try (BufferedReader reader = new BufferedReader( // İş bitince bu okuyucunun otomatik kapatılmasını sağlar.
+            new InputStreamReader(client.getInputStream()));
+            PrintWriter out = new PrintWriter(client.getOutputStream(), true)) { // Gelen veri akışını okur.
 
         String line;
+        CommandParser parser = new CommandParser();
+        
+
         while ((line = reader.readLine()) != null) {
             String text = line.trim();
             if (text.isEmpty()) continue;
+
+            Command cmd = parser.parse(text);
+
+            if(cmd instanceof SetCommand){
+                SetCommand setCmd = (SetCommand) cmd;
+                map.put(setCmd.getId(), setCmd.getMsg());
+                out.println("OK"); // Başarılıysa OK yazdır.
+            
+                continue; //Broadcaste girme
+            }
+
+            else if (cmd instanceof GetCommand) {
+                    GetCommand getCmd = (GetCommand) cmd;
+                    String result = map.get(getCmd.getId());
+
+                    if (result == null) {
+                        out.println("NOT_FOUND");
+                    } else {
+                        out.println(result);
+                    }
+                    
+                    // Komut işlendi, broadcast yapma, döngü başına dön.
+                    continue; 
+                }
 
             long ts = System.currentTimeMillis();
 
@@ -178,7 +211,8 @@ private static void broadcastToFamily(NodeRegistry registry,
                 FamilyServiceGrpc.FamilyServiceBlockingStub stub =
                         FamilyServiceGrpc.newBlockingStub(channel);
 
-                FamilyView view = stub.join(self);
+                // Karşılıklı tanışma
+                FamilyView view = stub.join(self); 
                 registry.addAll(view.getMembersList());
 
                 System.out.printf("Joined through %s:%d, family size now: %d%n",
@@ -253,4 +287,51 @@ private static void broadcastToFamily(NodeRegistry registry,
     }, 5, 10, TimeUnit.SECONDS); // 5 sn sonra başla, 10 sn'de bir kontrol et
 }
 
+    public static class CommandParser {
+
+        public Command parse(String line) {
+            if (line == null) return null;
+            
+            // Trim yapıp değişkene atadık
+            String trimmedLine = line.trim();
+            if (trimmedLine.isEmpty()) return null;
+
+            String pieces[] = trimmedLine.split(" ", 3);
+
+            if (pieces.length == 0) return null;
+            
+            if (pieces[0].equals("SET")) {
+                if (pieces.length < 3) return null; // Eksik bilgi varsa null dön
+                return new SetCommand(pieces[1], pieces[2]);
+            }
+
+            else if (pieces[0].equals("GET")) {
+                if (pieces.length < 2) return null; // ID yoksa null dön
+                return new GetCommand(pieces[1]);
+            }
+
+            return null;
+        }
+    }
+
+    public static class SetCommand implements Command{
+        private String id;
+        private String msg;
+
+        public SetCommand(String id, String msg) {
+            this.id = id;
+            this.msg = msg;
+        }
+
+        public String getId() { return id; } 
+        public String getMsg() { return msg; }
+    }
+
+    public static class GetCommand implements Command{
+        private String id;
+
+        public GetCommand(String id) { this.id = id; }
+
+        public String getId() { return id; }
+    }
 }
