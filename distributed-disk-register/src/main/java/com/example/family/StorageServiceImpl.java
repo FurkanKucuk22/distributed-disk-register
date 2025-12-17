@@ -9,9 +9,23 @@ import family.StoredMessage;
 import family.StoreResult;
 import io.grpc.stub.StreamObserver;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+
 public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBase {
 
   private final DataStore dataStore;
+  private static final File MESSAGE_DIR = new File("messages");
+
+  static {
+    if (!MESSAGE_DIR.exists()) {
+      MESSAGE_DIR.mkdirs();
+    }
+  }
 
   // Servisimiz çalışmak için bir Veri Deposuna ihtiyaç duyar
   public StorageServiceImpl(DataStore dataStore) {
@@ -20,39 +34,46 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
 
   @Override
   public void store(StoredMessage request, StreamObserver<StoreResult> responseObserver) {
-    // 1. Gelen Protobuf mesajından verileri al
-    // Not: SetCommand constructor'ı String beklediği için şimdilik çeviriyoruz.
-    // İleride SetCommand'a doğrudan "request" nesnesini veren bir constructor
-    // ekleyerek bunu hızlandırabiliriz.
-    String key = String.valueOf(request.getId());
-    String value = request.getText();
+    try {
+      // 1. Gelen Protobuf mesajından verileri al
+      int id = request.getId();
+      String value = request.getText();
 
-    // 2. Komutu oluştur ve çalıştır
-    SetCommand command = new SetCommand(key, value);
-    command.execute(dataStore);
+      // 2. Memory'e kaydet
+      dataStore.set(id, value);
 
-    // 3. Sonucu hazırla (Başarılı)
-    StoreResult result = StoreResult.newBuilder().setSuccess(true).build();
+      // 3. Disk'e kaydet
+      writeMessageToDisk(id, value);
 
-    // 4. Cevabı gönder ve işlemi kapat
-    responseObserver.onNext(result);
-    responseObserver.onCompleted();
+      // 4. Sonucu hazırla (Başarılı)
+      StoreResult result = StoreResult.newBuilder().setSuccess(true).build();
 
-    System.out.println("GRPC ile veri kaydedildi: " + key + " -> " + value);
+      // 5. Cevabı gönder ve işlemi kapat
+      responseObserver.onNext(result);
+      responseObserver.onCompleted();
+
+      System.out.println("GRPC ile veri kaydedildi (disk+memory): " + id + " -> " + value);
+    } catch (Exception e) {
+      System.err.println("Store operation failed: " + e.getMessage());
+      StoreResult result = StoreResult.newBuilder().setSuccess(false).build();
+      responseObserver.onNext(result);
+      responseObserver.onCompleted();
+    }
   }
 
   @Override
   public void retrieve(MessageId request, StreamObserver<StoredMessage> responseObserver) {
     // 1. İstenen ID'yi al
-    String key = String.valueOf(request.getId());
+    int id = request.getId();
 
-    // 2. Komutu oluştur ve çalıştır
-    GetCommand command = new GetCommand(key);
-    String foundValue = command.execute(dataStore);
+    // 2. Diskten oku
+    String foundValue = readMessageFromDisk(id);
 
     // 3. Bulunan değeri Protobuf mesajına paketle
-    // Eğer "NOT_FOUND" döndüyse boş veya hata mesajı dönebiliriz, şimdilik olduğu
-    // gibi dönelim.
+    if (foundValue == null) {
+      foundValue = "NOT_FOUND";
+    }
+    
     StoredMessage response = StoredMessage.newBuilder()
         .setId(request.getId())
         .setText(foundValue)
@@ -62,6 +83,29 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     responseObserver.onNext(response);
     responseObserver.onCompleted();
 
-    System.out.println("GRPC ile veri okundu: " + key);
+    System.out.println("GRPC ile veri okundu: " + id + " -> " + foundValue);
+  }
+
+  private void writeMessageToDisk(int id, String msg) {
+    File file = new File(MESSAGE_DIR, id + ".msg");
+    try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+      bw.write(msg);
+    } catch (IOException e) {
+      System.err.println("Failed to write message to disk: " + e.getMessage());
+    }
+  }
+
+  private String readMessageFromDisk(int id) {
+    File file = new File(MESSAGE_DIR, id + ".msg");
+    if (!file.exists()) {
+      return null;
+    }
+
+    try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+      return br.readLine();
+    } catch (IOException e) {
+      System.err.println("Failed to read message from disk: " + e.getMessage());
+      return null;
+    }
   }
 }

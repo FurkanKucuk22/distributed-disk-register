@@ -21,6 +21,10 @@ import family.Empty;
 import family.FamilyServiceGrpc;
 import family.FamilyView;
 import family.NodeInfo;
+import family.StorageServiceGrpc;
+import family.StoredMessage;
+import family.MessageId;
+import family.StoreResult;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
@@ -40,8 +44,11 @@ public class NodeMain {
     private static final int PRINT_INTERVAL_SECONDS = 10;
     // SET/GET verilerini tuttuğumuz Map
     private static final DataStore STORE = new DataStore();
+    private static final MessageReplicaTracker REPLICA_TRACKER = new MessageReplicaTracker();
 
     public static void main(String[] args) throws Exception {
+        ToleranceConfig.loadConfig();
+        
         String host = "127.0.0.1";
         int port = findFreePort(START_PORT); // 5555 ve sonrası için boş olan ilk portu verir
 
@@ -119,18 +126,29 @@ public class NodeMain {
                     String result;
 
                     if (cmd instanceof SetCommand setCmd) {
+                        int messageId = setCmd.getKey();
+                        String messageText = setCmd.getValue();
+                        
                         // Memory'e yaz
-                        STORE.set(setCmd.getKey(), setCmd.getValue());
+                        STORE.set(messageId, messageText);
 
                         // Disk'e yaz
-                        writeMessageToDisk(setCmd.getKey(), setCmd.getValue());
+                        writeMessageToDisk(messageId, messageText);
 
-                        result = "OK";
+                        // Distributed replication
+                        result = replicateToMembers(registry, self, messageId, messageText);
 
                     } else if (cmd instanceof GetCommand getCmd) {
+                        int messageId = getCmd.getKey();
+                        
                         // Diskten oku
-                        String value = readMessageFromDisk(getCmd.getKey());
+                        String value = readMessageFromDisk(messageId);
 
+                        if (value == null) {
+                            // Kendi diskinde yoksa, üyelerden almayı dene
+                            value = retrieveFromMembers(messageId);
+                        }
+                        
                         if (value == null) {
                             result = "NOT_FOUND";
                         } else {
@@ -340,5 +358,111 @@ public class NodeMain {
             e.printStackTrace();
             return null;
         }
+    }
+
+    private static String replicateToMembers(NodeRegistry registry, NodeInfo self, int messageId, String messageText) {
+        int tolerance = ToleranceConfig.getTolerance();
+        List<NodeInfo> allMembers = registry.snapshot();
+        
+        List<NodeInfo> eligibleMembers = new ArrayList<>();
+        for (NodeInfo member : allMembers) {
+            if (!(member.getHost().equals(self.getHost()) && member.getPort() == self.getPort())) {
+                eligibleMembers.add(member);
+            }
+        }
+
+        if (eligibleMembers.isEmpty()) {
+            System.out.println("No members available for replication, only leader exists");
+            return "OK";
+        }
+
+        int replicasNeeded = Math.min(tolerance, eligibleMembers.size());
+        List<NodeInfo> selectedMembers = eligibleMembers.subList(0, replicasNeeded);
+
+        int successCount = 0;
+        for (NodeInfo member : selectedMembers) {
+            ManagedChannel channel = null;
+            try {
+                channel = ManagedChannelBuilder
+                        .forAddress(member.getHost(), member.getPort())
+                        .usePlaintext()
+                        .build();
+
+                StorageServiceGrpc.StorageServiceBlockingStub stub = 
+                        StorageServiceGrpc.newBlockingStub(channel);
+
+                StoredMessage msg = StoredMessage.newBuilder()
+                        .setId(messageId)
+                        .setText(messageText)
+                        .build();
+
+                StoreResult result = stub.store(msg);
+
+                if (result.getSuccess()) {
+                    REPLICA_TRACKER.addReplica(messageId, member);
+                    successCount++;
+                    System.out.printf("Replicated message %d to %s:%d%n", 
+                            messageId, member.getHost(), member.getPort());
+                }
+
+            } catch (Exception e) {
+                System.err.printf("Failed to replicate to %s:%d - %s%n",
+                        member.getHost(), member.getPort(), e.getMessage());
+            } finally {
+                if (channel != null) {
+                    channel.shutdownNow();
+                }
+            }
+        }
+
+        if (successCount == replicasNeeded) {
+            return "OK";
+        } else {
+            return "ERROR: Failed to replicate to all required members (" + successCount + "/" + replicasNeeded + ")";
+        }
+    }
+
+    private static String retrieveFromMembers(int messageId) {
+        List<NodeInfo> members = REPLICA_TRACKER.getMembersForMessage(messageId);
+        
+        if (members.isEmpty()) {
+            System.out.println("No replica information found for message " + messageId);
+            return null;
+        }
+
+        for (NodeInfo member : members) {
+            ManagedChannel channel = null;
+            try {
+                channel = ManagedChannelBuilder
+                        .forAddress(member.getHost(), member.getPort())
+                        .usePlaintext()
+                        .build();
+
+                StorageServiceGrpc.StorageServiceBlockingStub stub = 
+                        StorageServiceGrpc.newBlockingStub(channel);
+
+                MessageId msgId = MessageId.newBuilder()
+                        .setId(messageId)
+                        .build();
+
+                StoredMessage response = stub.retrieve(msgId);
+
+                if (response != null && !response.getText().isEmpty()) {
+                    System.out.printf("Retrieved message %d from %s:%d%n", 
+                            messageId, member.getHost(), member.getPort());
+                    return response.getText();
+                }
+
+            } catch (Exception e) {
+                System.err.printf("Failed to retrieve from %s:%d - %s%n",
+                        member.getHost(), member.getPort(), e.getMessage());
+            } finally {
+                if (channel != null) {
+                    channel.shutdownNow();
+                }
+            }
+        }
+
+        return null;
     }
 }
