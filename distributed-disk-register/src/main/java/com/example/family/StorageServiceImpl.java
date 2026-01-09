@@ -2,7 +2,6 @@ package com.example.family; // Paket adın neyse ona dikkat et
 
 import com.example.family.SetGetCommand.*;
 
-
 import family.MessageId;
 import family.StorageServiceGrpc;
 import family.StoredMessage;
@@ -19,17 +18,29 @@ import java.io.IOException;
 public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBase {
 
   private final DataStore dataStore;
-  private static final File MESSAGE_DIR = new File("messages");
-
-  static {
-    if (!MESSAGE_DIR.exists()) {
-      MESSAGE_DIR.mkdirs();
-    }
-  }
+  // ARTIK STATIC DEĞİL: Her nesnenin (node'un) kendi klasör yolu var
+  private final File messageDir;
 
   // Servisimiz çalışmak için bir Veri Deposuna ihtiyaç duyar
-  public StorageServiceImpl(DataStore dataStore) {
+  // Constructor değişti: Artık port numarasını da alıyor
+  public StorageServiceImpl(DataStore dataStore, int port) {
     this.dataStore = dataStore;
+
+    // 1. ADIM: Ana "messages" klasörünü tanımla ve yoksa oluştur
+    File parentDir = new File("messages");
+    if (!parentDir.exists()) {
+      parentDir.mkdirs();
+    }
+
+    // 2. ADIM: Ana klasörün içine node'a özel klasörü (messages_5555) oluştur
+    this.messageDir = new File(parentDir, "messages_" + port);
+
+    if (!this.messageDir.exists()) {
+      this.messageDir.mkdirs();
+      System.out.println("Klasör yolu oluşturuldu: " + this.messageDir.getPath());
+    }
+    // Düğüm açıldığında diskteki eski mesajları hafızaya (DataStore) yükle
+    loadExistingMessages();
   }
 
   @Override
@@ -73,7 +84,7 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     if (foundValue == null) {
       foundValue = "NOT_FOUND";
     }
-    
+
     StoredMessage response = StoredMessage.newBuilder()
         .setId(request.getId())
         .setText(foundValue)
@@ -87,7 +98,9 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
   }
 
   private void writeMessageToDisk(int id, String msg) {
-    File file = new File(MESSAGE_DIR, id + ".msg");
+    File file = new File(this.messageDir
+
+        , id + ".msg");
     try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
       bw.write(msg);
     } catch (IOException e) {
@@ -96,7 +109,9 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
   }
 
   private String readMessageFromDisk(int id) {
-    File file = new File(MESSAGE_DIR, id + ".msg");
+    File file = new File(this.messageDir
+
+        , id + ".msg");
     if (!file.exists()) {
       return null;
     }
@@ -106,6 +121,31 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     } catch (IOException e) {
       System.err.println("Failed to read message from disk: " + e.getMessage());
       return null;
+    }
+  }
+
+  private void loadExistingMessages() {
+    File[] files = this.messageDir.listFiles((dir, name) -> name.endsWith(".msg"));
+
+    if (files != null) {
+      for (File file : files) {
+        try {
+          // Dosya adından ID'yi al (Örn: "5.msg" -> 5)
+          String fileName = file.getName();
+          int id = Integer.parseInt(fileName.replace(".msg", ""));
+
+          // Dosya içeriğini oku
+          String value = readMessageFromDisk(id);
+
+          // Hafızaya yükle
+          if (value != null) {
+            dataStore.set(id, value);
+          }
+        } catch (Exception e) {
+          System.err.println("Eski mesaj yüklenirken hata: " + file.getName());
+        }
+      }
+      System.out.println("Diskten " + files.length + " mesaj geri yüklendi.");
     }
   }
 }

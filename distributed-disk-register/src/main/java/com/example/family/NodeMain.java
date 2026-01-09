@@ -1,10 +1,7 @@
 package com.example.family;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -51,9 +48,21 @@ public class NodeMain {
 
     public static void main(String[] args) throws Exception {
         ToleranceConfig.loadConfig();
-        
+
         String host = "127.0.0.1";
         int port = findFreePort(START_PORT); // 5555 ve sonrası için boş olan ilk portu verir
+
+        // 1. Ana klasör
+        File parentDir = new File("messages");
+        if (!parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+        // 2. Node klasörü (messages/messages_5555)
+        currentNodeDir = new File(parentDir, "messages_" + port);
+        if (!currentNodeDir.exists()) {
+            currentNodeDir.mkdirs();
+        }
+        System.out.println("Aktif Disk Klasörü: " + currentNodeDir.getPath());
 
         NodeInfo self = NodeInfo.newBuilder() // Üyenin kendisi
                 .setHost(host)
@@ -63,7 +72,7 @@ public class NodeMain {
         NodeRegistry registry = new NodeRegistry();
         FamilyServiceImpl service = new FamilyServiceImpl(registry, self);
 
-        StorageServiceImpl storageService = new StorageServiceImpl(STORE);
+        StorageServiceImpl storageService = new StorageServiceImpl(STORE, port);
 
         Server server = ServerBuilder
                 .forPort(port)
@@ -124,13 +133,13 @@ public class NodeMain {
 
                 if (text.equalsIgnoreCase("STATS")) {
                     String statsReport = calculateLoadStats(registry);
-                    
+
                     // Sonucu client'a yaz
                     PrintWriter writer = new PrintWriter(client.getOutputStream(), true);
                     writer.println(statsReport);
-                    
+
                     // Döngünün başına dön (Broadcast yapmaya gerek yok)
-                    continue; 
+                    continue;
                 }
 
                 try {
@@ -142,30 +151,30 @@ public class NodeMain {
                     if (cmd instanceof SetCommand setCmd) {
                         int messageId = setCmd.getKey();
                         String messageText = setCmd.getValue();
-                        
-                        // Memory'e yaz
-                        STORE.set(messageId, messageText);
 
-                        // Disk'e yaz
-                        writeMessageToDisk(messageId, messageText);
+                        // // Memory'e yaz
+                        // STORE.set(messageId, messageText);
+
+                        // // Disk'e yaz
+                        // writeMessageToDisk(messageId, messageText);
 
                         // Distributed replication
                         result = replicateToMembers(registry, self, messageId, messageText);
 
                     } else if (cmd instanceof GetCommand getCmd) {
                         int messageId = getCmd.getKey();
-                        
+
                         // Diskten oku
-                        
+
                         // String value = readMessageFromDisk(messageId);
 
                         // if (value == null) {
                         // Kendi diskinde yoksa, üyelerden almayı dene
-                        //  value = retrieveFromMembers(messageId);
+                        // value = retrieveFromMembers(messageId);
                         // }
-                        
+
                         String value = retrieveFromMembers(messageId);
-                        
+
                         if (value == null) {
                             result = "NOT_FOUND";
                         } else {
@@ -291,10 +300,13 @@ public class NodeMain {
         scheduler.scheduleAtFixedRate(() -> {
             List<NodeInfo> members = registry.snapshot();
             System.out.println("======================================");
-            System.out.printf("Family at %s:%d (me)%n", self.getHost(), self.getPort());
+            System.out.printf("Node Status [%s:%d]%n", self.getHost(), self.getPort());
             System.out.println("Time: " + LocalDateTime.now());
-            System.out.println("Members:");
 
+            // Üyeler periyodik olarak kendi disklerinde kaç mesaj sakladıklarını bastırmalıdır.
+            System.out.println("Yerelde Kaydedilen Mesajlar: " + STORE.getSize());
+
+            System.out.println("Family Members:");
             for (NodeInfo n : members) {
                 boolean isMe = n.getHost().equals(self.getHost()) && n.getPort() == self.getPort();
                 System.out.printf(" - %s:%d%s%n",
@@ -302,6 +314,14 @@ public class NodeMain {
                         n.getPort(),
                         isMe ? " (me)" : "");
             }
+
+            // Lider, periyodik olarak sistemde toplam kaç mesaj saklandığını bastırmalıdır.
+            if (self.getPort() == START_PORT) {
+                System.out.println("\n--- LEADER REPORT ---");
+                // Mevcut calculateLoadStats metodunu kullanarak genel durumu basıyoruz
+                System.out.print(calculateLoadStats(registry));
+            }
+
             System.out.println("======================================");
         }, 3, PRINT_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
@@ -346,41 +366,35 @@ public class NodeMain {
         }, 5, 10, TimeUnit.SECONDS); // 5 sn sonra başla, 10 sn'de bir kontrol et
     }
 
-    private static final File MESSAGE_DIR = new File("messages");
+    private static File currentNodeDir;
 
-    static {
-        if (!MESSAGE_DIR.exists()) {
-            MESSAGE_DIR.mkdirs();
-        }
-    }
+    // private static void writeMessageToDisk(int id, String msg) { // String id -> int id
+    //     File file = new File(currentNodeDir, id + ".msg");
+    //     try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+    //         bw.write(msg);
+    //     } catch (IOException e) {
+    //         e.printStackTrace();
+    //     }
+    // }
 
-    private static void writeMessageToDisk(int id, String msg) { // String id -> int id
-        File file = new File(MESSAGE_DIR, id + ".msg");
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
-            bw.write(msg);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+    // private static String readMessageFromDisk(int id) { // String id -> int id
+    //     File file = new File(currentNodeDir, id + ".msg");
+    //     if (!file.exists()) {
+    //         return null;
+    //     }
 
-    private static String readMessageFromDisk(int id) { // String id -> int id
-        File file = new File(MESSAGE_DIR, id + ".msg");
-        if (!file.exists()) {
-            return null;
-        }
-
-        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
-            return br.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
+    //     try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+    //         return br.readLine();
+    //     } catch (IOException e) {
+    //         e.printStackTrace();
+    //         return null;
+    //     }
+    // }
 
     private static String replicateToMembers(NodeRegistry registry, NodeInfo self, int messageId, String messageText) {
         int tolerance = ToleranceConfig.getTolerance();
         List<NodeInfo> allMembers = registry.snapshot();
-        
+
         List<NodeInfo> eligibleMembers = new ArrayList<>();
         for (NodeInfo member : allMembers) {
             if (!(member.getHost().equals(self.getHost()) && member.getPort() == self.getPort())) {
@@ -397,59 +411,58 @@ public class NodeMain {
         int replicasNeeded = Math.min(tolerance, eligibleMembers.size());
         int startIndex = messageId % eligibleMembers.size();
         List<NodeInfo> selectedMembers = new ArrayList<>();
-    for (int i = 0; i < replicasNeeded; i++) {
-        // Döngüsel seçim (Wrap around): Listenin sonuna gelince başa dön
-        int currentIndex = (startIndex + i) % eligibleMembers.size();
-        selectedMembers.add(eligibleMembers.get(currentIndex));
-    }
+        for (int i = 0; i < replicasNeeded; i++) {
+            // Döngüsel seçim (Wrap around): Listenin sonuna gelince başa dön
+            int currentIndex = (startIndex + i) % eligibleMembers.size();
+            selectedMembers.add(eligibleMembers.get(currentIndex));
+        }
 
-    // 4. ADIM: Seçilen üyelere gönder
-    int successCount = 0;
-    for (NodeInfo member : selectedMembers) {
-        ManagedChannel channel = null;
-        try {
-            channel = ManagedChannelBuilder
-                    .forAddress(member.getHost(), member.getPort())
-                    .usePlaintext()
-                    .build();
+        // 4. ADIM: Seçilen üyelere gönder
+        int successCount = 0;
+        for (NodeInfo member : selectedMembers) {
+            ManagedChannel channel = null;
+            try {
+                channel = ManagedChannelBuilder
+                        .forAddress(member.getHost(), member.getPort())
+                        .usePlaintext()
+                        .build();
 
-            StorageServiceGrpc.StorageServiceBlockingStub stub =
-                    StorageServiceGrpc.newBlockingStub(channel);
+                StorageServiceGrpc.StorageServiceBlockingStub stub = StorageServiceGrpc.newBlockingStub(channel);
 
-            StoredMessage msg = StoredMessage.newBuilder()
-                    .setId(messageId)
-                    .setText(messageText)
-                    .build();
+                StoredMessage msg = StoredMessage.newBuilder()
+                        .setId(messageId)
+                        .setText(messageText)
+                        .build();
 
-            StoreResult result = stub.store(msg);
+                StoreResult result = stub.store(msg);
 
-            if (result.getSuccess()) {
-                REPLICA_TRACKER.addReplica(messageId, member);
-                successCount++;
-                System.out.printf("Replicated msg %d to %s:%d (LoadBalanced)%n",
-                        messageId, member.getHost(), member.getPort());
-            }
+                if (result.getSuccess()) {
+                    REPLICA_TRACKER.addReplica(messageId, member);
+                    successCount++;
+                    System.out.printf("Replicated msg %d to %s:%d (LoadBalanced)%n",
+                            messageId, member.getHost(), member.getPort());
+                }
 
-        } catch (Exception e) {
-            System.err.printf("Failed to replicate to %s:%d - %s%n",
-                    member.getHost(), member.getPort(), e.getMessage());
-        } finally {
-            if (channel != null) {
-                channel.shutdownNow();
+            } catch (Exception e) {
+                System.err.printf("Failed to replicate to %s:%d - %s%n",
+                        member.getHost(), member.getPort(), e.getMessage());
+            } finally {
+                if (channel != null) {
+                    channel.shutdownNow();
+                }
             }
         }
-    }
 
-    if (successCount >= 1) { // En az 1 yere bile gitse OK sayabiliriz (tasarım tercihi)
-        return "OK";
-    } else {
-        return "ERROR: Replication failed";
-    }
+        if (successCount >= 1) { // En az 1 yere bile gitse OK sayabiliriz (tasarım tercihi)
+            return "OK";
+        } else {
+            return "ERROR: Replication failed";
+        }
     }
 
     private static String retrieveFromMembers(int messageId) {
         List<NodeInfo> members = REPLICA_TRACKER.getMembersForMessage(messageId);
-        
+
         if (members.isEmpty()) {
             System.out.println("No replica information found for message " + messageId);
             return null;
@@ -463,8 +476,7 @@ public class NodeMain {
                         .usePlaintext()
                         .build();
 
-                StorageServiceGrpc.StorageServiceBlockingStub stub = 
-                        StorageServiceGrpc.newBlockingStub(channel);
+                StorageServiceGrpc.StorageServiceBlockingStub stub = StorageServiceGrpc.newBlockingStub(channel);
 
                 MessageId msgId = MessageId.newBuilder()
                         .setId(messageId)
@@ -473,7 +485,7 @@ public class NodeMain {
                 StoredMessage response = stub.retrieve(msgId);
 
                 if (response != null && !response.getText().isEmpty()) {
-                    System.out.printf("Retrieved message %d from %s:%d%n", 
+                    System.out.printf("Retrieved message %d from %s:%d%n",
                             messageId, member.getHost(), member.getPort());
                     return response.getText();
                 }
@@ -490,6 +502,7 @@ public class NodeMain {
 
         return null;
     }
+
     private static String calculateLoadStats(NodeRegistry registry) {
         Map<Integer, List<NodeInfo>> data = REPLICA_TRACKER.getSnapshot();
         Map<String, Integer> nodeCounts = new HashMap<>();
@@ -504,9 +517,9 @@ public class NodeMain {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("\n=== LOAD BALANCING STATS ===\n");
-        sb.append("Total Messages Stored: ").append(data.size()).append("\n");
-        
+        sb.append("\n=== MESAJ DAĞILIMLARI ===\n");
+        sb.append("Toplam Kaydedilen Mesajlar: ").append(data.size()).append("\n");
+
         // Registry'deki (bildiğimiz) tüm üyeleri listele
         List<NodeInfo> allMembers = new ArrayList<>(registry.snapshot());
         // Port numarasına göre sırala ki çıktı okunaklı olsun
@@ -515,10 +528,10 @@ public class NodeMain {
         for (NodeInfo member : allMembers) {
             String key = member.getHost() + ":" + member.getPort();
             int count = nodeCounts.getOrDefault(key, 0);
-            sb.append(String.format("Node %s -> %d messages\n", key, count));
+            sb.append(String.format("Node %s -> %d mesaj\n", key, count));
         }
-        sb.append("============================\n");
-        
+        // sb.append("============================\n");
+
         return sb.toString();
     }
 }

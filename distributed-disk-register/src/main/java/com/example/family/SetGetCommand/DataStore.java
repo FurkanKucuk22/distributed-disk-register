@@ -16,4 +16,7 @@ public class DataStore {
         return map.getOrDefault(key, "NOT_FOUND");
     }
 
+    public int getSize() {
+        return map.size();
+    }
 }
