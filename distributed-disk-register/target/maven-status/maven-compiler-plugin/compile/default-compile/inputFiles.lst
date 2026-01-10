@@ -9,6 +9,7 @@
 /home/furkann/distributed-disk-register/distributed-disk-register/target/generated-sources/protobuf/java/family/MessageIdOrBuilder.java
 /home/furkann/distributed-disk-register/distributed-disk-register/src/main/java/com/example/family/SetGetCommand/CommandParser.java
 /home/furkann/distributed-disk-register/distributed-disk-register/src/main/java/com/example/family/SetGetCommand/SetCommand.java
+/home/furkann/distributed-disk-register/distributed-disk-register/src/main/java/com/example/family/TestClient.java
 /home/furkann/distributed-disk-register/distributed-disk-register/target/generated-sources/protobuf/java/family/ChatMessageOrBuilder.java
 /home/furkann/distributed-disk-register/distributed-disk-register/src/main/java/com/example/family/FamilyServiceImpl.java
 /home/furkann/distributed-disk-register/distributed-disk-register/target/generated-sources/protobuf/java/family/StoredMessageOrBuilder.java

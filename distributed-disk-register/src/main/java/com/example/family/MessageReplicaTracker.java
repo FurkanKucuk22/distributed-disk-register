@@ -65,7 +65,7 @@ public class MessageReplicaTracker {
     // ==========================================
 
     // Yeni bir dağıtım bilgisini dosyanın sonuna ekler
-    private void appendTrackerToDisk(int messageId, NodeInfo member) {
+    private synchronized void appendTrackerToDisk(int messageId, NodeInfo member) {
         // Format: ID,HOST,PORT (Örn: 5,127.0.0.1,5556)
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(TRACKER_FILE, true))) {
             String line = messageId + "," + member.getHost() + "," + member.getPort();
