@@ -178,7 +178,7 @@ public class NodeMain {
                         if (value == null) {
                             result = "NOT_FOUND";
                         } else {
-                            result = value;
+                            result = "OK " + value;
                         }
 
                     } else {

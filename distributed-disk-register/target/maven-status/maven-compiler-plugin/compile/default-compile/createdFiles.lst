@@ -1,5 +1,6 @@
 family/StorageServiceGrpc$StorageServiceBlockingStub.class
 family/FamilyProto.class
+com/example/family/Tests/TestClient.class
 family/NodeInfo$1.class
 family/StorageServiceGrpc$1.class
 com/example/family/NodeRegistry.class
@@ -15,8 +16,11 @@ family/StorageServiceGrpc.class
 family/NodeInfo.class
 family/FamilyServiceGrpc$FamilyServiceStub.class
 family/MessageIdOrBuilder.class
+com/example/family/Tests/HaToKuSeClient$Config.class
 family/StoreResult.class
+com/example/family/Tests/PerformanceTest.class
 family/StoredMessage.class
+com/example/family/Tests/HaToKuSeClient.class
 com/example/family/SetGetCommand/SetCommand.class
 family/StoreResultOrBuilder.class
 family/FamilyServiceGrpc$AsyncService.class
@@ -32,6 +36,7 @@ com/example/family/MessageReplicaTracker.class
 family/FamilyView.class
 family/StoreResult$1.class
 family/FamilyView$1.class
+com/example/family/Tests/ConcurrencyTest.class
 family/StorageServiceGrpc$StorageServiceFutureStub.class
 family/FamilyServiceGrpc$FamilyServiceImplBase.class
 family/StoreResult$Builder.class
@@ -41,6 +46,7 @@ com/example/family/StorageServiceImpl.class
 family/Empty.class
 family/StorageServiceGrpc$3.class
 com/example/family/SetGetCommand/Command.class
+com/example/family/Tests/HaToKuSeClient$Connection.class
 family/Empty$Builder.class
 family/ChatMessageOrBuilder.class
 family/StoredMessage$1.class
@@ -58,7 +64,6 @@ family/StorageServiceGrpc$StorageServiceBaseDescriptorSupplier.class
 family/StorageServiceGrpc$StorageServiceFileDescriptorSupplier.class
 family/NodeInfo$Builder.class
 family/StoredMessage$Builder.class
-com/example/family/TestClient.class
 com/example/family/SetGetCommand/GetCommand.class
 family/FamilyServiceGrpc$2.class
 family/ChatMessage$1.class
