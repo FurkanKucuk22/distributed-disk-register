@@ -28,11 +28,26 @@ public class MessageReplicaTracker {
     }
 
     public void addReplica(int messageId, NodeInfo member) {
-        // 1. Önce RAM'e ekle (Program çalışırken hızlı erişim için)
-        messageToMembers.computeIfAbsent(messageId, k -> new ArrayList<>()).add(member);
+        // 1. Önce RAM'e ekle (ANCAK ARTIK KONTROLLÜ EKLİYORUZ)
+        addReplicaToMemory(messageId, member);
         
         // 2. Sonra Diske ekle (Kapanınca unutmamak için)
         appendTrackerToDisk(messageId, member);
+    }
+
+    private void addReplicaToMemory(int messageId, NodeInfo member) {
+        // İlgili mesajın listesini al, yoksa yarat
+        List<NodeInfo> currentMembers = messageToMembers.computeIfAbsent(messageId, k -> new ArrayList<>());
+
+        // Liderde bu üye zaten kayıtlı mı? (Duplicate Kontrolü)
+        boolean alreadyExists = currentMembers.stream()
+                .anyMatch(m -> m.getHost().equals(member.getHost()) 
+                            && m.getPort() == member.getPort());
+
+        // Eğer yoksa ekle. Varsa pas geç.
+        if (!alreadyExists) {
+            currentMembers.add(member);
+        }
     }
 
     public List<NodeInfo> getMembersForMessage(int messageId) {
@@ -103,8 +118,8 @@ public class MessageReplicaTracker {
                                 .setPort(port)
                                 .build();
 
-                        // RAM'deki listeye ekle (Burada appendTrackerToDisk çağırmıyoruz, döngü olur!)
-                        messageToMembers.computeIfAbsent(id, k -> new ArrayList<>()).add(info);
+                        // RAM'deki listeye ekle Kontrollü ekleme metodunu çağırıyoruz
+                        addReplicaToMemory(id, info);
                         count++;
                     } catch (NumberFormatException e) {
                         System.err.println("Satır parse edilemedi: " + line);
