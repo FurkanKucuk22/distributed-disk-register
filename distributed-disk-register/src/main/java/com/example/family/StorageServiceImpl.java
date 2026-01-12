@@ -1,4 +1,4 @@
-package com.example.family; // Paket adın neyse ona dikkat et
+package com.example.family; 
 
 import com.example.family.SetGetCommand.*;
 
@@ -43,6 +43,7 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     loadExistingMessages();
   }
 
+  // Gelen id ve text bilgilerini alır, hem memory'e hem de disk'e kaydeder
   @Override
   public void store(StoredMessage request, StreamObserver<StoreResult> responseObserver) {
     try {
@@ -72,6 +73,7 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     }
   }
 
+  // Gelen id bilgisine göre diskteki mesajı okur ve geri döner
   @Override
   public void retrieve(MessageId request, StreamObserver<StoredMessage> responseObserver) {
     // 1. İstenen ID'yi al
@@ -97,6 +99,11 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     System.out.println("GRPC ile veri okundu: " + id + " -> " + foundValue);
   }
 
+  // ==========================================
+  //       DOSYA İŞLEMLERİ (PERSISTENCE)
+  // ==========================================
+
+  // Verilen id ve mesajı diske yazar
   private void writeMessageToDisk(int id, String msg) {
     File file = new File(this.messageDir
 
@@ -108,6 +115,7 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     }
   }
 
+  // Verilen id'ye sahip mesajı diskten okur
   private String readMessageFromDisk(int id) {
     File file = new File(this.messageDir
 
@@ -124,6 +132,7 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     }
   }
 
+  // Düğüm açıldığında diskteki tüm mesajları hafızaya (DataStore) yükler
   private void loadExistingMessages() {
     File[] files = this.messageDir.listFiles((dir, name) -> name.endsWith(".msg"));
 
