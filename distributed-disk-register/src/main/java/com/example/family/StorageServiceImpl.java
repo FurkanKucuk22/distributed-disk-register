@@ -1,4 +1,4 @@
-package com.example.family; 
+package com.example.family;
 
 import com.example.family.SetGetCommand.*;
 
@@ -79,10 +79,20 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     // 1. İstenen ID'yi al
     int id = request.getId();
 
-    // 2. Diskten oku
-    String foundValue = readMessageFromDisk(id);
+    // 2) Önce CACHE’ten dene (RAM)
+    String foundValue = dataStore.get(id);
 
-    // 3. Bulunan değeri Protobuf mesajına paketle
+    // 3) Cache’te yoksa DISK’ten oku
+    if (foundValue == null) {
+      foundValue = readMessageFromDisk(id);
+
+      // Diskte bulunduysa cache’e koy (sonraki okumalar hızlı)
+      if (foundValue != null) {
+        dataStore.set(id, foundValue);
+      }
+    }
+
+    // 4. Bulunan değeri Protobuf mesajına paketle
     if (foundValue == null) {
       foundValue = "NOT_FOUND";
     }
@@ -100,7 +110,7 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
   }
 
   // ==========================================
-  //       DOSYA İŞLEMLERİ (PERSISTENCE)
+  // DOSYA İŞLEMLERİ (PERSISTENCE)
   // ==========================================
 
   // Verilen id ve mesajı diske yazar

@@ -64,6 +64,7 @@ public class NodeMain {
         }
         System.out.println("Aktif Disk Klasörü: " + currentNodeDir.getPath());
 
+
         NodeInfo self = NodeInfo.newBuilder() // Üyenin kendisi
                 .setHost(host)
                 .setPort(port)
