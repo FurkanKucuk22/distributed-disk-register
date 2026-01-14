@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.example.family.SetGetCommand.Command;
 import com.example.family.SetGetCommand.CommandParser;
-import com.example.family.SetGetCommand.DataStore;
+// DataStore import removed
 import com.example.family.SetGetCommand.GetCommand;
 import com.example.family.SetGetCommand.SetCommand;
 
@@ -46,12 +46,12 @@ public class NodeMain {
     private static final int START_PORT = 5555;
     private static final int PRINT_INTERVAL_SECONDS = 10;
     // SET/GET verilerini tuttuğumuz Map
-    private static final DataStore STORE = new DataStore();
+    // STORE removed
     private static final MessageReplicaTracker REPLICA_TRACKER = new MessageReplicaTracker();
 
     public static void main(String[] args) throws Exception {
         ToleranceConfig.loadConfig();
-        
+
         String host = "127.0.0.1";
         int port = findFreePort(START_PORT); // 5555 ve sonrası için boş olan ilk portu verir
 
@@ -63,7 +63,7 @@ public class NodeMain {
         NodeRegistry registry = new NodeRegistry();
         FamilyServiceImpl service = new FamilyServiceImpl(registry, self);
 
-        StorageServiceImpl storageService = new StorageServiceImpl(STORE);
+        StorageServiceImpl storageService = new StorageServiceImpl();
 
         Server server = ServerBuilder
                 .forPort(port)
@@ -124,13 +124,13 @@ public class NodeMain {
 
                 if (text.equalsIgnoreCase("STATS")) {
                     String statsReport = calculateLoadStats(registry);
-                    
+
                     // Sonucu client'a yaz
                     PrintWriter writer = new PrintWriter(client.getOutputStream(), true);
                     writer.println(statsReport);
-                    
+
                     // Döngünün başına dön (Broadcast yapmaya gerek yok)
-                    continue; 
+                    continue;
                 }
 
                 try {
@@ -142,9 +142,6 @@ public class NodeMain {
                     if (cmd instanceof SetCommand setCmd) {
                         int messageId = setCmd.getKey();
                         String messageText = setCmd.getValue();
-                        
-                        // Memory'e yaz
-                        STORE.set(messageId, messageText);
 
                         // Disk'e yaz
                         writeMessageToDisk(messageId, messageText);
@@ -154,18 +151,18 @@ public class NodeMain {
 
                     } else if (cmd instanceof GetCommand getCmd) {
                         int messageId = getCmd.getKey();
-                        
+
                         // Diskten oku
-                        
+
                         // String value = readMessageFromDisk(messageId);
 
                         // if (value == null) {
                         // Kendi diskinde yoksa, üyelerden almayı dene
-                        //  value = retrieveFromMembers(messageId);
+                        // value = retrieveFromMembers(messageId);
                         // }
-                        
+
                         String value = retrieveFromMembers(messageId);
-                        
+
                         if (value == null) {
                             result = "NOT_FOUND";
                         } else {
@@ -380,7 +377,7 @@ public class NodeMain {
     private static String replicateToMembers(NodeRegistry registry, NodeInfo self, int messageId, String messageText) {
         int tolerance = ToleranceConfig.getTolerance();
         List<NodeInfo> allMembers = registry.snapshot();
-        
+
         List<NodeInfo> eligibleMembers = new ArrayList<>();
         for (NodeInfo member : allMembers) {
             if (!(member.getHost().equals(self.getHost()) && member.getPort() == self.getPort())) {
@@ -397,59 +394,58 @@ public class NodeMain {
         int replicasNeeded = Math.min(tolerance, eligibleMembers.size());
         int startIndex = messageId % eligibleMembers.size();
         List<NodeInfo> selectedMembers = new ArrayList<>();
-    for (int i = 0; i < replicasNeeded; i++) {
-        // Döngüsel seçim (Wrap around): Listenin sonuna gelince başa dön
-        int currentIndex = (startIndex + i) % eligibleMembers.size();
-        selectedMembers.add(eligibleMembers.get(currentIndex));
-    }
+        for (int i = 0; i < replicasNeeded; i++) {
+            // Döngüsel seçim (Wrap around): Listenin sonuna gelince başa dön
+            int currentIndex = (startIndex + i) % eligibleMembers.size();
+            selectedMembers.add(eligibleMembers.get(currentIndex));
+        }
 
-    // 4. ADIM: Seçilen üyelere gönder
-    int successCount = 0;
-    for (NodeInfo member : selectedMembers) {
-        ManagedChannel channel = null;
-        try {
-            channel = ManagedChannelBuilder
-                    .forAddress(member.getHost(), member.getPort())
-                    .usePlaintext()
-                    .build();
+        // 4. ADIM: Seçilen üyelere gönder
+        int successCount = 0;
+        for (NodeInfo member : selectedMembers) {
+            ManagedChannel channel = null;
+            try {
+                channel = ManagedChannelBuilder
+                        .forAddress(member.getHost(), member.getPort())
+                        .usePlaintext()
+                        .build();
 
-            StorageServiceGrpc.StorageServiceBlockingStub stub =
-                    StorageServiceGrpc.newBlockingStub(channel);
+                StorageServiceGrpc.StorageServiceBlockingStub stub = StorageServiceGrpc.newBlockingStub(channel);
 
-            StoredMessage msg = StoredMessage.newBuilder()
-                    .setId(messageId)
-                    .setText(messageText)
-                    .build();
+                StoredMessage msg = StoredMessage.newBuilder()
+                        .setId(messageId)
+                        .setText(messageText)
+                        .build();
 
-            StoreResult result = stub.store(msg);
+                StoreResult result = stub.store(msg);
 
-            if (result.getSuccess()) {
-                REPLICA_TRACKER.addReplica(messageId, member);
-                successCount++;
-                System.out.printf("Replicated msg %d to %s:%d (LoadBalanced)%n",
-                        messageId, member.getHost(), member.getPort());
-            }
+                if (result.getSuccess()) {
+                    REPLICA_TRACKER.addReplica(messageId, member);
+                    successCount++;
+                    System.out.printf("Replicated msg %d to %s:%d (LoadBalanced)%n",
+                            messageId, member.getHost(), member.getPort());
+                }
 
-        } catch (Exception e) {
-            System.err.printf("Failed to replicate to %s:%d - %s%n",
-                    member.getHost(), member.getPort(), e.getMessage());
-        } finally {
-            if (channel != null) {
-                channel.shutdownNow();
+            } catch (Exception e) {
+                System.err.printf("Failed to replicate to %s:%d - %s%n",
+                        member.getHost(), member.getPort(), e.getMessage());
+            } finally {
+                if (channel != null) {
+                    channel.shutdownNow();
+                }
             }
         }
-    }
 
-    if (successCount >= 1) { // En az 1 yere bile gitse OK sayabiliriz (tasarım tercihi)
-        return "OK";
-    } else {
-        return "ERROR: Replication failed";
-    }
+        if (successCount >= 1) { // En az 1 yere bile gitse OK sayabiliriz (tasarım tercihi)
+            return "OK";
+        } else {
+            return "ERROR: Replication failed";
+        }
     }
 
     private static String retrieveFromMembers(int messageId) {
         List<NodeInfo> members = REPLICA_TRACKER.getMembersForMessage(messageId);
-        
+
         if (members.isEmpty()) {
             System.out.println("No replica information found for message " + messageId);
             return null;
@@ -463,8 +459,7 @@ public class NodeMain {
                         .usePlaintext()
                         .build();
 
-                StorageServiceGrpc.StorageServiceBlockingStub stub = 
-                        StorageServiceGrpc.newBlockingStub(channel);
+                StorageServiceGrpc.StorageServiceBlockingStub stub = StorageServiceGrpc.newBlockingStub(channel);
 
                 MessageId msgId = MessageId.newBuilder()
                         .setId(messageId)
@@ -473,7 +468,7 @@ public class NodeMain {
                 StoredMessage response = stub.retrieve(msgId);
 
                 if (response != null && !response.getText().isEmpty()) {
-                    System.out.printf("Retrieved message %d from %s:%d%n", 
+                    System.out.printf("Retrieved message %d from %s:%d%n",
                             messageId, member.getHost(), member.getPort());
                     return response.getText();
                 }
@@ -490,6 +485,7 @@ public class NodeMain {
 
         return null;
     }
+
     private static String calculateLoadStats(NodeRegistry registry) {
         Map<Integer, List<NodeInfo>> data = REPLICA_TRACKER.getSnapshot();
         Map<String, Integer> nodeCounts = new HashMap<>();
@@ -506,7 +502,7 @@ public class NodeMain {
         StringBuilder sb = new StringBuilder();
         sb.append("\n=== LOAD BALANCING STATS ===\n");
         sb.append("Total Messages Stored: ").append(data.size()).append("\n");
-        
+
         // Registry'deki (bildiğimiz) tüm üyeleri listele
         List<NodeInfo> allMembers = new ArrayList<>(registry.snapshot());
         // Port numarasına göre sırala ki çıktı okunaklı olsun
@@ -518,7 +514,7 @@ public class NodeMain {
             sb.append(String.format("Node %s -> %d messages\n", key, count));
         }
         sb.append("============================\n");
-        
+
         return sb.toString();
     }
 }

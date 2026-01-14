@@ -1,8 +1,6 @@
-package com.example.family; // Paket adın neyse ona dikkat et
+package com.example.family;
 
 import com.example.family.SetGetCommand.*;
-
-
 import family.MessageId;
 import family.StorageServiceGrpc;
 import family.StoredMessage;
@@ -18,7 +16,6 @@ import java.io.IOException;
 
 public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBase {
 
-  private final DataStore dataStore;
   private static final File MESSAGE_DIR = new File("messages");
 
   static {
@@ -27,9 +24,8 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     }
   }
 
-  // Servisimiz çalışmak için bir Veri Deposuna ihtiyaç duyar
-  public StorageServiceImpl(DataStore dataStore) {
-    this.dataStore = dataStore;
+  // Servisimiz (Artık sadece disk kullanıyor)
+  public StorageServiceImpl() {
   }
 
   @Override
@@ -39,8 +35,8 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
       int id = request.getId();
       String value = request.getText();
 
-      // 2. Memory'e kaydet
-      dataStore.set(id, value);
+      // 2. Memory'e kaydetme kısmını kaldırdık (Gereksiz RAM kullanımı)
+      // dataStore.set(id, value);
 
       // 3. Disk'e kaydet
       writeMessageToDisk(id, value);
@@ -52,7 +48,7 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
       responseObserver.onNext(result);
       responseObserver.onCompleted();
 
-      System.out.println("GRPC ile veri kaydedildi (disk+memory): " + id + " -> " + value);
+      System.out.println("GRPC ile veri kaydedildi (disk): " + id + " -> " + value);
     } catch (Exception e) {
       System.err.println("Store operation failed: " + e.getMessage());
       StoreResult result = StoreResult.newBuilder().setSuccess(false).build();
@@ -73,7 +69,7 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     if (foundValue == null) {
       foundValue = "NOT_FOUND";
     }
-    
+
     StoredMessage response = StoredMessage.newBuilder()
         .setId(request.getId())
         .setText(foundValue)
