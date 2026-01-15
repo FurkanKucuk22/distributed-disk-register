@@ -1,11 +1,5 @@
 package com.example.family;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -13,41 +7,42 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import family.NodeInfo;
+
 public class MessageReplicaTracker {
-    
+
     // =====================================================
     // RAM'DEKİ ANA VERİ YAPISI
     // =====================================================
     // messageId -> bu mesajın tutulduğu node'lar
     // Thread-safe olsun diye ConcurrentHashMap kullanıyoruz
     private final Map<Integer, List<NodeInfo>> messageToMembers = new ConcurrentHashMap<>();
-    
-    // =====================================================
-    // DISK ÜZERİNDEKİ KALICI KAYIT DOSYASI
-    // =====================================================
-    // Uygulama kapanıp açılsa bile geçmiş replikasyon bilgileri
-    // kaybolmasın diye kullanılıyor
-    private static final File TRACKER_FILE = new File("distribution.log");
 
     // =====================================================
     // CONSTRUCTOR
     // =====================================================
-    // Nesne oluşturulurken diskten eski kayıtları RAM'e yükler
+    // Eskiden burada diskten log okuyup RAM'e yüklüyorduk.
+    // Artık KESİNLİKLE diskten yükleme istemiyoruz.
+    // Bu yüzden constructor boş kalıyor.
     public MessageReplicaTracker() {
-        loadTrackerFromDisk();
+        // loadTrackerFromDisk();  // ❌ ARTIK YOK: diskten yükleme yapılmasın
     }
 
     // =====================================================
     // DIŞARIDAN ÇAĞRILAN ANA METOT
     // =====================================================
-    // Bir mesajın belirli bir node'a başarıyla replike edildiğini
-    // hem RAM'e hem diske kaydeder
+    // Eskiden:
+    // 1) RAM'e yaz
+    // 2) Diske append et
+    //
+    // Artık:
+    // Sadece RAM'e yazacağız. Disk yok.
     public void addReplica(int messageId, NodeInfo member) {
-        // 1) Önce RAM'e ekle (duplicate kontrolü var)
+
+        // 1) RAM'e ekle (duplicate kontrolü var)
         addReplicaToMemory(messageId, member);
-        
-        // 2) Sonra diske ekle (kalıcılık için)
-        appendTrackerToDisk(messageId, member);
+
+        // 2) Disk'e yazma kısmı KALDIRILDI
+        // appendTrackerToDisk(messageId, member); // ❌ artık yok
     }
 
     // =====================================================
@@ -56,6 +51,7 @@ public class MessageReplicaTracker {
     private void addReplicaToMemory(int messageId, NodeInfo member) {
 
         // Mesaj için liste yoksa oluştur
+        // computeIfAbsent: yoksa yeni ArrayList oluşturup map'e koyar
         List<NodeInfo> currentMembers =
                 messageToMembers.computeIfAbsent(messageId, k -> new ArrayList<>());
 
@@ -76,7 +72,9 @@ public class MessageReplicaTracker {
     // BİR MESAJIN BULUNDUĞU NODE'LARI GETİR
     // =====================================================
     public List<NodeInfo> getMembersForMessage(int messageId) {
-        return messageToMembers.getOrDefault(messageId, new ArrayList<>());
+        // Eğer yoksa boş liste döndür
+        // (Yeni ArrayList dönüyoruz ki dışarıdan değiştirseler bile map bozulmasın)
+        return new ArrayList<>(messageToMembers.getOrDefault(messageId, new ArrayList<>()));
     }
 
     // =====================================================
@@ -84,8 +82,8 @@ public class MessageReplicaTracker {
     // =====================================================
     public void removeDeadMember(NodeInfo deadMember) {
 
-        // Diskten silme YOK (append-only tasarım)
-        // Sadece RAM'den çıkarıyoruz
+        // Disk zaten kullanılmıyor (append-only yok).
+        // Sadece RAM'den çıkarıyoruz.
         for (List<NodeInfo> members : messageToMembers.values()) {
             members.removeIf(m ->
                     m.getHost().equals(deadMember.getHost()) &&
@@ -106,75 +104,19 @@ public class MessageReplicaTracker {
     }
 
     // =====================================================
-    // SALT DIŞARDAN OKUNUR SNAPSHOT
+    // SADECE OKUNUR SNAPSHOT
     // =====================================================
-    // Map'in dışarıdan değiştirilmesini engeller
+    // Dışarıdan map'in tamamen değiştirilmesini engeller
     public Map<Integer, List<NodeInfo>> getSnapshot() {
         return Collections.unmodifiableMap(messageToMembers);
     }
 
     // =====================================================
-    // DISK'E EKLEME (APPEND-ONLY)
+    // ⚠️ ESKİ DISK FONKSİYONLARI KALDIRILDI
     // =====================================================
-    private synchronized void appendTrackerToDisk(int messageId, NodeInfo member) {
-        // Format: messageId,host,port
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(TRACKER_FILE, true))) {
-            String line = messageId + "," + member.getHost() + "," + member.getPort();
-            bw.write(line);
-            bw.newLine();
-        } catch (IOException e) {
-            System.err.println("Lider: Tracker dosyasına yazılamadı: " + e.getMessage());
-        }
-    }
-
-    // =====================================================
-    // UYGULAMA BAŞLARKEN DISKTEN YÜKLE
-    // =====================================================
-    private void loadTrackerFromDisk() {
-
-        // Dosya yoksa (ilk çalıştırma) çık
-        if (!TRACKER_FILE.exists()) {
-            return;
-        }
-
-        System.out.println("Lider: Geçmiş dağılım verisi yükleniyor...");
-        int count = 0;
-
-        try (BufferedReader br = new BufferedReader(new FileReader(TRACKER_FILE))) {
-            String line;
-
-            while ((line = br.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty()) continue;
-
-                String[] parts = line.split(",");
-
-                // Beklenen format: 3 parça
-                if (parts.length == 3) {
-                    try {
-                        int id = Integer.parseInt(parts[0]);
-                        String host = parts[1];
-                        int port = Integer.parseInt(parts[2]);
-
-                        NodeInfo info = NodeInfo.newBuilder()
-                                .setHost(host)
-                                .setPort(port)
-                                .build();
-
-                        // RAM'e kontrollü ekleme
-                        addReplicaToMemory(id, info);
-                        count++;
-
-                    } catch (NumberFormatException e) {
-                        System.err.println("Satır parse edilemedi: " + line);
-                    }
-                }
-            }
-
-            System.out.println("Lider: " + count + " adet kayıt başarıyla geri yüklendi.");
-
-        } catch (Exception e) {
-            System.err.println("Tracker dosyası okunurken hata: " + e.getMessage());
-        }
-    }
+    // appendTrackerToDisk(...) ❌
+    // loadTrackerFromDisk()   ❌
+    //
+    // Çünkü artık "distribution.log" kullanılmayacak,
+    // uygulama kapanıp açılınca replikasyon bilgisi sıfırdan başlayacak.
 }

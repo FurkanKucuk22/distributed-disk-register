@@ -90,6 +90,17 @@ private static final long serialVersionUID = 0L;
     return port_;
   }
 
+  public static final int READY_FIELD_NUMBER = 3;
+  private boolean ready_ = false;
+  /**
+   * <code>bool ready = 3;</code>
+   * @return The ready.
+   */
+  @java.lang.Override
+  public boolean getReady() {
+    return ready_;
+  }
+
   private byte memoizedIsInitialized = -1;
   @java.lang.Override
   public final boolean isInitialized() {
@@ -110,6 +121,9 @@ private static final long serialVersionUID = 0L;
     if (port_ != 0) {
       output.writeInt32(2, port_);
     }
+    if (ready_ != false) {
+      output.writeBool(3, ready_);
+    }
     getUnknownFields().writeTo(output);
   }
 
@@ -125,6 +139,10 @@ private static final long serialVersionUID = 0L;
     if (port_ != 0) {
       size += com.google.protobuf.CodedOutputStream
         .computeInt32Size(2, port_);
+    }
+    if (ready_ != false) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeBoolSize(3, ready_);
     }
     size += getUnknownFields().getSerializedSize();
     memoizedSize = size;
@@ -145,6 +163,8 @@ private static final long serialVersionUID = 0L;
         .equals(other.getHost())) return false;
     if (getPort()
         != other.getPort()) return false;
+    if (getReady()
+        != other.getReady()) return false;
     if (!getUnknownFields().equals(other.getUnknownFields())) return false;
     return true;
   }
@@ -160,6 +180,9 @@ private static final long serialVersionUID = 0L;
     hash = (53 * hash) + getHost().hashCode();
     hash = (37 * hash) + PORT_FIELD_NUMBER;
     hash = (53 * hash) + getPort();
+    hash = (37 * hash) + READY_FIELD_NUMBER;
+    hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(
+        getReady());
     hash = (29 * hash) + getUnknownFields().hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -293,6 +316,7 @@ private static final long serialVersionUID = 0L;
       bitField0_ = 0;
       host_ = "";
       port_ = 0;
+      ready_ = false;
       return this;
     }
 
@@ -331,6 +355,9 @@ private static final long serialVersionUID = 0L;
       }
       if (((from_bitField0_ & 0x00000002) != 0)) {
         result.port_ = port_;
+      }
+      if (((from_bitField0_ & 0x00000004) != 0)) {
+        result.ready_ = ready_;
       }
     }
 
@@ -386,6 +413,9 @@ private static final long serialVersionUID = 0L;
       if (other.getPort() != 0) {
         setPort(other.getPort());
       }
+      if (other.getReady() != false) {
+        setReady(other.getReady());
+      }
       this.mergeUnknownFields(other.getUnknownFields());
       onChanged();
       return this;
@@ -422,6 +452,11 @@ private static final long serialVersionUID = 0L;
               bitField0_ |= 0x00000002;
               break;
             } // case 16
+            case 24: {
+              ready_ = input.readBool();
+              bitField0_ |= 0x00000004;
+              break;
+            } // case 24
             default: {
               if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                 done = true; // was an endgroup tag
@@ -539,6 +574,38 @@ private static final long serialVersionUID = 0L;
     public Builder clearPort() {
       bitField0_ = (bitField0_ & ~0x00000002);
       port_ = 0;
+      onChanged();
+      return this;
+    }
+
+    private boolean ready_ ;
+    /**
+     * <code>bool ready = 3;</code>
+     * @return The ready.
+     */
+    @java.lang.Override
+    public boolean getReady() {
+      return ready_;
+    }
+    /**
+     * <code>bool ready = 3;</code>
+     * @param value The ready to set.
+     * @return This builder for chaining.
+     */
+    public Builder setReady(boolean value) {
+
+      ready_ = value;
+      bitField0_ |= 0x00000004;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>bool ready = 3;</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearReady() {
+      bitField0_ = (bitField0_ & ~0x00000004);
+      ready_ = false;
       onChanged();
       return this;
     }

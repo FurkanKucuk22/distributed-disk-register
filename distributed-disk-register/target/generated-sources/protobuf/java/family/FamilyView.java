@@ -81,6 +81,17 @@ private static final long serialVersionUID = 0L;
     return members_.get(index);
   }
 
+  public static final int ASSIGNEDPORT_FIELD_NUMBER = 2;
+  private int assignedPort_ = 0;
+  /**
+   * <code>int32 assignedPort = 2;</code>
+   * @return The assignedPort.
+   */
+  @java.lang.Override
+  public int getAssignedPort() {
+    return assignedPort_;
+  }
+
   private byte memoizedIsInitialized = -1;
   @java.lang.Override
   public final boolean isInitialized() {
@@ -98,6 +109,9 @@ private static final long serialVersionUID = 0L;
     for (int i = 0; i < members_.size(); i++) {
       output.writeMessage(1, members_.get(i));
     }
+    if (assignedPort_ != 0) {
+      output.writeInt32(2, assignedPort_);
+    }
     getUnknownFields().writeTo(output);
   }
 
@@ -110,6 +124,10 @@ private static final long serialVersionUID = 0L;
     for (int i = 0; i < members_.size(); i++) {
       size += com.google.protobuf.CodedOutputStream
         .computeMessageSize(1, members_.get(i));
+    }
+    if (assignedPort_ != 0) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeInt32Size(2, assignedPort_);
     }
     size += getUnknownFields().getSerializedSize();
     memoizedSize = size;
@@ -128,6 +146,8 @@ private static final long serialVersionUID = 0L;
 
     if (!getMembersList()
         .equals(other.getMembersList())) return false;
+    if (getAssignedPort()
+        != other.getAssignedPort()) return false;
     if (!getUnknownFields().equals(other.getUnknownFields())) return false;
     return true;
   }
@@ -143,6 +163,8 @@ private static final long serialVersionUID = 0L;
       hash = (37 * hash) + MEMBERS_FIELD_NUMBER;
       hash = (53 * hash) + getMembersList().hashCode();
     }
+    hash = (37 * hash) + ASSIGNEDPORT_FIELD_NUMBER;
+    hash = (53 * hash) + getAssignedPort();
     hash = (29 * hash) + getUnknownFields().hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -281,6 +303,7 @@ private static final long serialVersionUID = 0L;
         membersBuilder_.clear();
       }
       bitField0_ = (bitField0_ & ~0x00000001);
+      assignedPort_ = 0;
       return this;
     }
 
@@ -327,6 +350,9 @@ private static final long serialVersionUID = 0L;
 
     private void buildPartial0(family.FamilyView result) {
       int from_bitField0_ = bitField0_;
+      if (((from_bitField0_ & 0x00000002) != 0)) {
+        result.assignedPort_ = assignedPort_;
+      }
     }
 
     @java.lang.Override
@@ -399,6 +425,9 @@ private static final long serialVersionUID = 0L;
           }
         }
       }
+      if (other.getAssignedPort() != 0) {
+        setAssignedPort(other.getAssignedPort());
+      }
       this.mergeUnknownFields(other.getUnknownFields());
       onChanged();
       return this;
@@ -438,6 +467,11 @@ private static final long serialVersionUID = 0L;
               }
               break;
             } // case 10
+            case 16: {
+              assignedPort_ = input.readInt32();
+              bitField0_ |= 0x00000002;
+              break;
+            } // case 16
             default: {
               if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                 done = true; // was an endgroup tag
@@ -693,6 +727,38 @@ private static final long serialVersionUID = 0L;
         members_ = null;
       }
       return membersBuilder_;
+    }
+
+    private int assignedPort_ ;
+    /**
+     * <code>int32 assignedPort = 2;</code>
+     * @return The assignedPort.
+     */
+    @java.lang.Override
+    public int getAssignedPort() {
+      return assignedPort_;
+    }
+    /**
+     * <code>int32 assignedPort = 2;</code>
+     * @param value The assignedPort to set.
+     * @return This builder for chaining.
+     */
+    public Builder setAssignedPort(int value) {
+
+      assignedPort_ = value;
+      bitField0_ |= 0x00000002;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>int32 assignedPort = 2;</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearAssignedPort() {
+      bitField0_ = (bitField0_ & ~0x00000002);
+      assignedPort_ = 0;
+      onChanged();
+      return this;
     }
     @java.lang.Override
     public final Builder setUnknownFields(

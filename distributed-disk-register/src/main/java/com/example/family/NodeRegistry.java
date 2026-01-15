@@ -9,26 +9,35 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class NodeRegistry {
 
-    // NodeInfo nesnelerinden oluşan set ConcurrentHashMap.newKeySet for thread safe (eş zamanlı) işlemler
+    // Thread-safe node set
     private final Set<NodeInfo> nodes = ConcurrentHashMap.newKeySet();
 
-    // Yeni bir node’u family listesine ekler.
+    // Yeni bir node ekle
     public void add(NodeInfo node) {
         nodes.add(node);
     }
 
-    // Birden fazla node’u family listesine ekler.
+    // Birden fazla node ekle
     public void addAll(Collection<NodeInfo> others) {
         nodes.addAll(others);
     }
 
-    // Tüm node’ları döner.
+    // Snapshot al (immutable liste)
     public List<NodeInfo> snapshot() {
         return List.copyOf(nodes);
     }
 
-    // Bir node’u family listesinden çıkarır.
+    // ❗ host + port'a göre sil
     public void remove(NodeInfo node) {
-        nodes.remove(node);
+        nodes.removeIf(n ->
+                n.getHost().equals(node.getHost()) &&
+                n.getPort() == node.getPort()
+        );
+    }
+
+    // UPDATE + INSERT
+    public synchronized void upsert(NodeInfo node) {
+        remove(node); // aynı host:port varsa sil
+        add(node);    // güncel hali ekle
     }
 }

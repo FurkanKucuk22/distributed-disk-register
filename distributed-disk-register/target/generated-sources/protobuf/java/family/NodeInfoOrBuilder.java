@@ -25,4 +25,10 @@ public interface NodeInfoOrBuilder extends
    * @return The port.
    */
   int getPort();
+
+  /**
+   * <code>bool ready = 3;</code>
+   * @return The ready.
+   */
+  boolean getReady();
 }

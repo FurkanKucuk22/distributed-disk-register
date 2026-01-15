@@ -31,4 +31,10 @@ public interface FamilyViewOrBuilder extends
    */
   family.NodeInfoOrBuilder getMembersOrBuilder(
       int index);
+
+  /**
+   * <code>int32 assignedPort = 2;</code>
+   * @return The assignedPort.
+   */
+  int getAssignedPort();
 }
