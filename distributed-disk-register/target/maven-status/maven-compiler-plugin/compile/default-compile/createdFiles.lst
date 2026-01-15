@@ -64,6 +64,7 @@ family/ChatMessage$Builder.class
 family/StorageServiceGrpc$StorageServiceBaseDescriptorSupplier.class
 family/StorageServiceGrpc$StorageServiceFileDescriptorSupplier.class
 family/NodeInfo$Builder.class
+com/example/family/NodeMain$ReplicationTask.class
 family/StoredMessage$Builder.class
 com/example/family/SetGetCommand/GetCommand.class
 family/FamilyServiceGrpc$2.class

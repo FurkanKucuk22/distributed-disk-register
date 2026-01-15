@@ -14,6 +14,11 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
+import java.io.RandomAccessFile;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+
 public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBase {
 
   private static final File MESSAGE_DIR = new File("messages");
@@ -82,14 +87,35 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     System.out.println("GRPC ile veri okundu: " + id + " -> " + foundValue);
   }
 
-  private void writeMessageToDisk(int id, String msg) {
+  // ZERO-COPY (Memory Mapped File) Yöntemi
+private void writeMessageToDisk(int id, String msg) {
     File file = new File(MESSAGE_DIR, id + ".msg");
-    try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
-      bw.write(msg);
+    
+    // 1. String veriyi byte dizisine çevir (Maliyetli ama zorunlu adım)
+    byte[] data = msg.getBytes(StandardCharsets.UTF_8);
+
+    // 2. RandomAccessFile ve FileChannel aç
+    // "rw" modu: Hem okuma hem yazma izni verir (Map işlemi için gereklidir)
+    try (RandomAccessFile raf = new RandomAccessFile(file, "rw");
+         FileChannel channel = raf.getChannel()) {
+
+        // 3. Dosyayı hafızaya haritala (Mapping)
+        // FileChannel.MapMode.READ_WRITE: Hem okuyup hem yazacağız
+        // 0: Başlangıç pozisyonu
+        // data.length: Dosyanın boyutu (byte dizisi kadar yer açar)
+        MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, data.length);
+
+        // 4. Veriyi direkt olarak haritalanmış hafıza alanına koy
+        // Bu işlem işletim sistemi seviyesinde diske asenkron olarak yansıtılır.
+        buffer.put(data);
+
+        // İsteğe bağlı: buffer.force(); 
+        // Verinin fiziksel diske yazıldığını garanti etmek için kullanılabilir 
+
     } catch (IOException e) {
-      System.err.println("Failed to write message to disk: " + e.getMessage());
+        System.err.println("Zero-Copy yazma hatası: " + e.getMessage());
     }
-  }
+}
 
   private String readMessageFromDisk(int id) {
     File file = new File(MESSAGE_DIR, id + ".msg");

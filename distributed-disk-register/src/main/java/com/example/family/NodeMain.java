@@ -179,7 +179,7 @@ public class NodeMain {
                         String messageText = setCmd.getValue();
 
                         // Disk'e yaz
-                        writeMessageToDisk(messageId, messageText);
+                        // writeMessageToDisk(messageId, messageText);
 
                         // Distributed replication
                         result = replicateToMembers(registry, self, messageId, messageText);
@@ -383,28 +383,28 @@ public class NodeMain {
         }
     }
 
-    private static void writeMessageToDisk(int id, String msg) { // String id -> int id
-        File file = new File(MESSAGE_DIR, id + ".msg");
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
-            bw.write(msg);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+    // private static void writeMessageToDisk(int id, String msg) { // String id -> int id
+    //     File file = new File(MESSAGE_DIR, id + ".msg");
+    //     try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+    //         bw.write(msg);
+    //     } catch (IOException e) {
+    //         e.printStackTrace();
+    //     }
+    // }
 
-    private static String readMessageFromDisk(int id) { // String id -> int id
-        File file = new File(MESSAGE_DIR, id + ".msg");
-        if (!file.exists()) {
-            return null;
-        }
+    // private static String readMessageFromDisk(int id) { // String id -> int id
+    //     File file = new File(MESSAGE_DIR, id + ".msg");
+    //     if (!file.exists()) {
+    //         return null;
+    //     }
 
-        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
-            return br.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
+    //     try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+    //         return br.readLine();
+    //     } catch (IOException e) {
+    //         e.printStackTrace();
+    //         return null;
+    //     }
+    // }
 
     private static String replicateToMembers(NodeRegistry registry, NodeInfo self, int messageId, String messageText) {
         int tolerance = ToleranceConfig.getTolerance();
