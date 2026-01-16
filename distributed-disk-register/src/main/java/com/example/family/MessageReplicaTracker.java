@@ -13,7 +13,22 @@ public class MessageReplicaTracker {
     private final Map<Integer, List<NodeInfo>> messageToMembers = new ConcurrentHashMap<>();
 
     public void addReplica(int messageId, NodeInfo member) {
-        messageToMembers.computeIfAbsent(messageId, k -> new ArrayList<>()).add(member);
+         // Mesaj için liste yoksa oluştur
+        // computeIfAbsent: yoksa yeni ArrayList oluşturup map'e koyar
+        List<NodeInfo> currentMembers =
+                messageToMembers.computeIfAbsent(messageId, k -> new ArrayList<>());
+
+        // Aynı node daha önce eklenmiş mi kontrol et
+        boolean alreadyExists = currentMembers.stream()
+                .anyMatch(m ->
+                        m.getHost().equals(member.getHost()) &&
+                        m.getPort() == member.getPort()
+                );
+
+        // Duplicate yoksa listeye ekle
+        if (!alreadyExists) {
+            currentMembers.add(member);
+        }
     }
 
     public List<NodeInfo> getMembersForMessage(int messageId) {
@@ -35,31 +50,7 @@ public class MessageReplicaTracker {
     public MessageReplicaTracker() {
         // loadTrackerFromDisk();  // ❌ ARTIK YOK: diskten yükleme yapılmasın
     }
-
-
-    // SADECE RAM'E EKLEME (KONTROLLÜ)
-    // =====================================================
-    private void addReplicaToMemory(int messageId, NodeInfo member) {
-
-        // Mesaj için liste yoksa oluştur
-        // computeIfAbsent: yoksa yeni ArrayList oluşturup map'e koyar
-        List<NodeInfo> currentMembers =
-                messageToMembers.computeIfAbsent(messageId, k -> new ArrayList<>());
-
-        // Aynı node daha önce eklenmiş mi kontrol et
-        boolean alreadyExists = currentMembers.stream()
-                .anyMatch(m ->
-                        m.getHost().equals(member.getHost()) &&
-                        m.getPort() == member.getPort()
-                );
-
-        // Duplicate yoksa listeye ekle
-        if (!alreadyExists) {
-            currentMembers.add(member);
-        }
-    }
-
-
+    
     // =====================================================
     // DEBUG / LOG AMAÇLI İSTATİSTİK
     // =====================================================
