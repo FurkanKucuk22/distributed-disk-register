@@ -4,15 +4,6 @@ import family.Empty;
 import family.FamilyServiceGrpc;
 import family.FamilyView;
 import family.NodeInfo;
-<<<<<<< HEAD
-import family.ChatMessage;
-import io.grpc.stub.StreamObserver;
-
-public class FamilyServiceImpl extends FamilyServiceGrpc.FamilyServiceImplBase {
-
-    private final NodeRegistry registry;
-    private final NodeInfo self;
-=======
 
 import java.util.HashMap;
 import java.util.Map;
@@ -61,22 +52,10 @@ public class FamilyServiceImpl extends FamilyServiceGrpc.FamilyServiceImplBase {
     // - Leader üyeler için port önerirken buradan başlar.
     // - Örn leader 5555 ise, üyeler 5556+ olsun diye ayarladık.
     private static final int BASE_PORT = 5556;
->>>>>>> main
 
     public FamilyServiceImpl(NodeRegistry registry, NodeInfo self) {
         this.registry = registry;
         this.self = self;
-<<<<<<< HEAD
-        this.registry.add(self);
-    }
-
-    @Override
-    public void join(NodeInfo request, StreamObserver<FamilyView> responseObserver) {
-        registry.add(request);
-
-        FamilyView view = FamilyView.newBuilder()
-                .addAllMembers(registry.snapshot())
-=======
         this.registry.add(self); // node kendini kendi listesine ekliyor.
 
         // ============================================================
@@ -100,31 +79,30 @@ public class FamilyServiceImpl extends FamilyServiceGrpc.FamilyServiceImplBase {
     // YENİ: Port tahsis fonksiyonu (leader logic)
     // ============================================================
     // Leader kendi kayıtlarına bakarak (membersByKey) bir port önerir.
-    private synchronized int allocatePort(String host) {
 
-        // Bu host için bir sonraki önerilecek portu al
-        // Yoksa BASE_PORT'tan başla
-        int port = nextPortByHost.getOrDefault(host, BASE_PORT);
+    private final java.util.Set<Integer> allocatedPorts = new java.util.HashSet<>();
+    private int nextPort = 5556;
 
-        // Bu host:port daha önce ailede kullanılmış mı?
-        // Kullanılmışsa port++ yapıp devam et.
-        // Bu "ağda dolu mu?" değil; "leader daha önce bu portu dağıtmış mı?" kontrolü.
-        while (membersByKey.containsKey(host + ":" + port)) {
+    private synchronized int allocatePort() {
+        int port = nextPort;
+
+        while (membersByKey.containsKey("ANY:" + port)) { // aşağıda anlatıcam
             port++;
         }
 
-        // Bu host için bir sonraki denenecek portu güncelle (port+1)
-        nextPortByHost.put(host, port + 1);
-
-        // Seçilen portu geri döndür
+        nextPort = port + 1;
         return port;
     }
 
     // ============================================================
-    //  JOIN = Port iste veya Ready bildir
+    // JOIN = Port iste veya Ready bildir
     // ============================================================
     @Override
     public synchronized void join(NodeInfo request, StreamObserver<FamilyView> responseObserver) {
+
+        System.out.println("[JOIN] host=" + request.getHost()
+                + " port=" + request.getPort()
+                + " ready=" + request.getReady());
 
         // assignedPort:
         // - Sadece request.port == 0 durumunda (port isteği) dolu olur.
@@ -137,22 +115,16 @@ public class FamilyServiceImpl extends FamilyServiceGrpc.FamilyServiceImplBase {
         // "Ben geldim ama portum yok, bana port ata."
         // ------------------------------------------------------------
         if (request.getPort() == 0) {
+            assignedPort = allocatePort();
 
-            // Leader bu host için bir port önerir (state'e göre)
-            assignedPort = allocatePort(request.getHost());
-
-            // Node henüz o portu bind edip açmadı, o yüzden ready=false
+            // SADECE rezerv defterine yaz (membersByKey), registry'ye ekleme!
             NodeInfo pending = NodeInfo.newBuilder()
                     .setHost(request.getHost())
                     .setPort(assignedPort)
-                    .setReady(false) // Bu port dağıtıldı ama node henüz açmadı rezerve edildi 
+                    .setReady(false)
                     .build();
 
-            // Leader defterine yaz
             membersByKey.put(key(pending), pending);
-
-            // Registry listesine de ekle (aile snapshot'ında görünsün)
-            registry.add(pending);
         }
 
         // ------------------------------------------------------------
@@ -186,25 +158,16 @@ public class FamilyServiceImpl extends FamilyServiceGrpc.FamilyServiceImplBase {
         FamilyView view = FamilyView.newBuilder()
                 .addAllMembers(registry.snapshot())
                 .setAssignedPort(assignedPort)
->>>>>>> main
                 .build();
 
         responseObserver.onNext(view);
         responseObserver.onCompleted();
     }
 
-<<<<<<< HEAD
-    @Override
-    public void getFamily(Empty request, StreamObserver<FamilyView> responseObserver) {
-        FamilyView view = FamilyView.newBuilder()
-                .addAllMembers(registry.snapshot())
-=======
-   
     @Override
     public void getFamily(Empty request, StreamObserver<FamilyView> responseObserver) {
         FamilyView view = FamilyView.newBuilder()
                 .addAllMembers(registry.snapshot()) // registry’de kim varsa ekle
->>>>>>> main
                 .build();
 
         responseObserver.onNext(view);

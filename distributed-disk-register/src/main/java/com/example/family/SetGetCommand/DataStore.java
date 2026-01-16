@@ -16,8 +16,4 @@ public class DataStore {
         return map.getOrDefault(key, "NOT_FOUND");
     }
 
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> main

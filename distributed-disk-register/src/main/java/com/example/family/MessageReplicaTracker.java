@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import family.NodeInfo;
 
 public class MessageReplicaTracker {
-<<<<<<< HEAD
+
     private final Map<Integer, List<NodeInfo>> messageToMembers = new ConcurrentHashMap<>();
 
     public void addReplica(int messageId, NodeInfo member) {
@@ -26,16 +26,6 @@ public class MessageReplicaTracker {
                               && m.getPort() == deadMember.getPort());
         }
     }
-
-=======
-
-    // =====================================================
-    // RAM'DEKİ ANA VERİ YAPISI
-    // =====================================================
-    // messageId -> bu mesajın tutulduğu node'lar
-    // Thread-safe olsun diye ConcurrentHashMap kullanıyoruz
-    private final Map<Integer, List<NodeInfo>> messageToMembers = new ConcurrentHashMap<>();
-
     // =====================================================
     // CONSTRUCTOR
     // =====================================================
@@ -46,25 +36,7 @@ public class MessageReplicaTracker {
         // loadTrackerFromDisk();  // ❌ ARTIK YOK: diskten yükleme yapılmasın
     }
 
-    // =====================================================
-    // DIŞARIDAN ÇAĞRILAN ANA METOT
-    // =====================================================
-    // Eskiden:
-    // 1) RAM'e yaz
-    // 2) Diske append et
-    //
-    // Artık:
-    // Sadece RAM'e yazacağız. Disk yok.
-    public void addReplica(int messageId, NodeInfo member) {
 
-        // 1) RAM'e ekle (duplicate kontrolü var)
-        addReplicaToMemory(messageId, member);
-
-        // 2) Disk'e yazma kısmı KALDIRILDI
-        // appendTrackerToDisk(messageId, member); // ❌ artık yok
-    }
-
-    // =====================================================
     // SADECE RAM'E EKLEME (KONTROLLÜ)
     // =====================================================
     private void addReplicaToMemory(int messageId, NodeInfo member) {
@@ -87,29 +59,6 @@ public class MessageReplicaTracker {
         }
     }
 
-    // =====================================================
-    // BİR MESAJIN BULUNDUĞU NODE'LARI GETİR
-    // =====================================================
-    public List<NodeInfo> getMembersForMessage(int messageId) {
-        // Eğer yoksa boş liste döndür
-        // (Yeni ArrayList dönüyoruz ki dışarıdan değiştirseler bile map bozulmasın)
-        return new ArrayList<>(messageToMembers.getOrDefault(messageId, new ArrayList<>()));
-    }
-
-    // =====================================================
-    // ÖLMÜŞ NODE'U TÜM MESAJLARDAN TEMİZLE
-    // =====================================================
-    public void removeDeadMember(NodeInfo deadMember) {
-
-        // Disk zaten kullanılmıyor (append-only yok).
-        // Sadece RAM'den çıkarıyoruz.
-        for (List<NodeInfo> members : messageToMembers.values()) {
-            members.removeIf(m ->
-                    m.getHost().equals(deadMember.getHost()) &&
-                    m.getPort() == deadMember.getPort()
-            );
-        }
-    }
 
     // =====================================================
     // DEBUG / LOG AMAÇLI İSTATİSTİK

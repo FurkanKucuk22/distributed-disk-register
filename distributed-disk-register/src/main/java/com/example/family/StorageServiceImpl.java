@@ -14,14 +14,11 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
-<<<<<<< HEAD
-=======
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 
->>>>>>> main
 public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBase {
 
   private static final File MESSAGE_DIR = new File("messages");
@@ -90,16 +87,6 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     System.out.println("GRPC ile veri okundu: " + id + " -> " + foundValue);
   }
 
-<<<<<<< HEAD
-  private void writeMessageToDisk(int id, String msg) {
-    File file = new File(MESSAGE_DIR, id + ".msg");
-    try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
-      bw.write(msg);
-    } catch (IOException e) {
-      System.err.println("Failed to write message to disk: " + e.getMessage());
-    }
-  }
-=======
   // ZERO-COPY (Memory Mapped File) Yöntemi
 private void writeMessageToDisk(int id, String msg) {
     File file = new File(MESSAGE_DIR, id + ".msg");
@@ -129,7 +116,6 @@ private void writeMessageToDisk(int id, String msg) {
         System.err.println("Zero-Copy yazma hatası: " + e.getMessage());
     }
 }
->>>>>>> main
 
   private String readMessageFromDisk(int id) {
     File file = new File(MESSAGE_DIR, id + ".msg");

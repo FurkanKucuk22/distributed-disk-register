@@ -1,19 +1,19 @@
 package com.example.family;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,48 +49,35 @@ public class NodeMain {
 
     public static void main(String[] args) throws Exception {
         ToleranceConfig.loadConfig();
+        String leaderHost = "192.168.1.172";
+        int leaderPort = 5555;
 
-        String host = "127.0.0.1";
-        String leaderHost = "127.0.0.1";
-        int leaderPort = START_PORT;
+        String host = getMyLanIp();
+        System.out.println("MY HOST = " + host);
+        System.out.println("LEADER  = " + leaderHost + ":" + leaderPort);
 
-        // YENİ: Program argümanlarından leader mı follower mı belirle
-        boolean isLeader = false;
         int port;
 
-        // 1) Önce 5555'te leader olmayı dene
-        try {
-            ServerSocket test = new ServerSocket(START_PORT); // 5555 portunu açmayı dene bakma amaçlı boşsa lider
-                                                              // kullancak
-            test.close();
-
-            // Buraya girdiysek 5555 BOŞ → lideriz
-            isLeader = true;
-            port = START_PORT;
-
-            System.out.println("This node became LEADER on port 5555");
-
-        } catch (IOException e) {
-            // 5555 dolu → leader var → follower olacağız
-            isLeader = false;
-            port = -1;
-
-            System.out.println("Leader already exists, this node is FOLLOWER");
+        if (host.equals(leaderHost) && canBindPort(leaderPort)) {
+            port = leaderPort;
+            System.out.println("LEADER (bound 5555)");
+        } else {
+            // follower: port iste + yerelde doluysa tekrar iste
+            while (true) {
+                port = requestPortFromLeader(leaderHost, leaderPort, host);
+                if (canBindPort(port))
+                    break;
+                System.out.println("Port " + port + " is busy locally, asking again...");
+            }
+            System.out.println("FOLLOWER PORT = " + port);
         }
-
-        if (!isLeader) {
-            port = requestPortFromLeader(leaderHost, leaderPort, host);
-            System.out.println("Follower received port from leader: " + port);
-        }
-
-        NodeInfo self = NodeInfo.newBuilder() // Üyenin kendisi
+        NodeInfo self = NodeInfo.newBuilder()
                 .setHost(host)
                 .setPort(port)
                 .build();
 
         NodeRegistry registry = new NodeRegistry();
         FamilyServiceImpl service = new FamilyServiceImpl(registry, self);
-
         StorageServiceImpl storageService = new StorageServiceImpl();
 
         Server server = ServerBuilder
@@ -102,12 +89,9 @@ public class NodeMain {
 
         System.out.printf("Node started on %s:%d%n", host, port);
 
-        // Eğer bu ilk node ise (port 5555), TCP 6666'da text dinlesin
         if (port == START_PORT) {
             startLeaderTextListener(registry, self);
-        }
-
-        if (port != START_PORT) {
+        } else {
             notifyReadyToLeader(leaderHost, leaderPort, host, port);
         }
 
@@ -116,7 +100,6 @@ public class NodeMain {
         startHealthChecker(registry, self);
 
         server.awaitTermination();
-
     }
 
     private static void startLeaderTextListener(NodeRegistry registry, NodeInfo self) {
@@ -578,6 +561,39 @@ public class NodeMain {
         } finally {
             channel.shutdownNow();
         }
+    }
+
+    private static boolean canBindPort(int port) {
+        try (ServerSocket ss = new ServerSocket(port)) {
+            ss.setReuseAddress(true);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static String getMyLanIp() {
+        try {
+            Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
+            while (ifaces.hasMoreElements()) {
+                NetworkInterface ni = ifaces.nextElement();
+                if (!ni.isUp() || ni.isLoopback())
+                    continue;
+
+                Enumeration<InetAddress> addrs = ni.getInetAddresses();
+                while (addrs.hasMoreElements()) {
+                    InetAddress a = addrs.nextElement();
+                    if (a instanceof Inet4Address && a.isSiteLocalAddress()) {
+                        String ip = a.getHostAddress();
+                        if (!ip.startsWith("169.254.")) { // link-local değil
+                            return ip;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return "127.0.0.1";
     }
 
 }

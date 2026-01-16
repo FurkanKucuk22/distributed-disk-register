@@ -18,10 +18,7 @@ public class GetCommand implements Command {
     }
     // -----------------------------
 
-<<<<<<< HEAD
-=======
     // Burada rame okuma işlemi yapılır
->>>>>>> main
     @Override
     public String execute(DataStore store) {
         return store.get(message.getId());
