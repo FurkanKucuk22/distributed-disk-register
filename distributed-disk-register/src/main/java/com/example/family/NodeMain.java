@@ -42,18 +42,61 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
 public class NodeMain {
+<<<<<<< HEAD
 
     private static final int START_PORT = 5555;
     private static final int PRINT_INTERVAL_SECONDS = 10;
     // SET/GET verilerini tuttuğumuz Map
     // STORE removed
+=======
+    private static final int START_PORT = 5555;
+    private static final int PRINT_INTERVAL_SECONDS = 10;
+    // STORE Removed
+>>>>>>> main
     private static final MessageReplicaTracker REPLICA_TRACKER = new MessageReplicaTracker();
 
     public static void main(String[] args) throws Exception {
         ToleranceConfig.loadConfig();
 
         String host = "127.0.0.1";
+<<<<<<< HEAD
         int port = findFreePort(START_PORT); // 5555 ve sonrası için boş olan ilk portu verir
+=======
+        String leaderHost = "127.0.0.1";
+        int leaderPort = START_PORT;
+
+        // int port = findFreePort(START_PORT); // 5555 ve sonrası için boş olan ilk
+        // portu verir
+
+        // YENİ: Program argümanlarından leader mı follower mı belirle
+        boolean isLeader = false;
+        int port;
+
+        // 1) Önce 5555'te leader olmayı dene
+        try {
+            ServerSocket test = new ServerSocket(START_PORT); // 5555 portunu açmayı dene bakma amaçlı boşsa lider
+                                                              // kullancak
+            test.close();
+
+            // Buraya girdiysek 5555 BOŞ → lideriz
+            isLeader = true;
+            port = START_PORT;
+
+            System.out.println("This node became LEADER on port 5555");
+
+        } catch (IOException e) {
+            // 5555 dolu → leader var → follower olacağız
+            isLeader = false;
+            port = -1;
+
+            System.out.println("Leader already exists, this node is FOLLOWER");
+        }
+
+        if (!isLeader) {
+            port = requestPortFromLeader(leaderHost, leaderPort, host);
+            System.out.println("Follower received port from leader: " + port);
+        }
+>>>>>>> main
 
         NodeInfo self = NodeInfo.newBuilder() // Üyenin kendisi
                 .setHost(host)
@@ -79,7 +122,15 @@ public class NodeMain {
             startLeaderTextListener(registry, self);
         }
 
+<<<<<<< HEAD
         discoverExistingNodes(host, port, registry, self);
+=======
+        if (port != START_PORT) {
+            notifyReadyToLeader(leaderHost, leaderPort, host, port);
+        }
+
+        discoverFamilyFromLeader(leaderHost, leaderPort, registry);
+>>>>>>> main
         startFamilyPrinter(registry, self);
         startHealthChecker(registry, self);
 
@@ -144,7 +195,11 @@ public class NodeMain {
                         String messageText = setCmd.getValue();
 
                         // Disk'e yaz
+<<<<<<< HEAD
                         writeMessageToDisk(messageId, messageText);
+=======
+                        // writeMessageToDisk(messageId, messageText);
+>>>>>>> main
 
                         // Distributed replication
                         result = replicateToMembers(registry, self, messageId, messageText);
@@ -166,7 +221,11 @@ public class NodeMain {
                         if (value == null) {
                             result = "NOT_FOUND";
                         } else {
+<<<<<<< HEAD
                             result = value;
+=======
+                            result = "OK " + value;
+>>>>>>> main
                         }
 
                     } else {
@@ -240,6 +299,7 @@ public class NodeMain {
         }
     }
 
+<<<<<<< HEAD
     private static int findFreePort(int startPort) {
         int port = startPort;
         while (true) {
@@ -279,6 +339,44 @@ public class NodeMain {
                     channel.shutdownNow();
                 }
             }
+=======
+    // private static int findFreePort(int startPort) {
+    // int port = startPort;
+    // while (true) {
+    // try (ServerSocket ignored = new ServerSocket(port)) {
+    // return port;
+    // } catch (IOException e) {
+    // port++;
+    // }
+    // }
+    // }
+
+    private static void discoverFamilyFromLeader(String leaderHost, int leaderPort,
+            NodeRegistry registry) {
+
+        ManagedChannel channel = null;
+        try {
+            channel = ManagedChannelBuilder
+                    .forAddress(leaderHost, leaderPort)
+                    .usePlaintext()
+                    .build();
+
+            FamilyServiceGrpc.FamilyServiceBlockingStub stub = FamilyServiceGrpc.newBlockingStub(channel);
+
+            // join değil! sadece family snapshot al
+            FamilyView view = stub.getFamily(Empty.newBuilder().build());
+
+            // registry'ye "upsert" mantığıyla basmak en sağlıklısı:
+            for (NodeInfo n : view.getMembersList()) {
+                registry.upsert(n);
+            }
+
+            System.out.println("Family pulled from leader. size=" + registry.snapshot().size());
+
+        } finally {
+            if (channel != null)
+                channel.shutdownNow();
+>>>>>>> main
         }
     }
 
@@ -351,6 +449,7 @@ public class NodeMain {
         }
     }
 
+<<<<<<< HEAD
     private static void writeMessageToDisk(int id, String msg) { // String id -> int id
         File file = new File(MESSAGE_DIR, id + ".msg");
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
@@ -373,6 +472,30 @@ public class NodeMain {
             return null;
         }
     }
+=======
+    // private static void writeMessageToDisk(int id, String msg) { // String id -> int id
+    //     File file = new File(MESSAGE_DIR, id + ".msg");
+    //     try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+    //         bw.write(msg);
+    //     } catch (IOException e) {
+    //         e.printStackTrace();
+    //     }
+    // }
+
+    // private static String readMessageFromDisk(int id) { // String id -> int id
+    //     File file = new File(MESSAGE_DIR, id + ".msg");
+    //     if (!file.exists()) {
+    //         return null;
+    //     }
+
+    //     try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+    //         return br.readLine();
+    //     } catch (IOException e) {
+    //         e.printStackTrace();
+    //         return null;
+    //     }
+    // }
+>>>>>>> main
 
     private static String replicateToMembers(NodeRegistry registry, NodeInfo self, int messageId, String messageText) {
         int tolerance = ToleranceConfig.getTolerance();
@@ -487,6 +610,7 @@ public class NodeMain {
     }
 
     private static String calculateLoadStats(NodeRegistry registry) {
+<<<<<<< HEAD
         Map<Integer, List<NodeInfo>> data = REPLICA_TRACKER.getSnapshot();
         Map<String, Integer> nodeCounts = new HashMap<>();
 
@@ -495,10 +619,51 @@ public class NodeMain {
             for (NodeInfo node : nodes) {
                 // Key olarak "Host:Port" kullanıyoruz
                 String key = node.getHost() + ":" + node.getPort();
+=======
+
+        // REPLICA_TRACKER içinden tüm mesaj → node listesi bilgisini alıyoruz
+        // Örnek yapı:
+        // messageId -> [node1, node2, node3]
+        Map<Integer, List<NodeInfo>> data = REPLICA_TRACKER.getSnapshot();
+
+        // Her node'un kaç mesaj tuttuğunu saymak için map
+        // Key: "host:port"
+        // Value: o node'daki mesaj sayısı
+        Map<String, Integer> nodeCounts = new HashMap<>();
+
+        // =====================================================
+        // 1) MESAJ → NODE DAĞILIMINI MEVCUT TABLOYU OKU VE SAY
+        // =====================================================
+        // Her mesajın hangi node'larda tutulduğunu geziyoruz
+
+        // Diyelim ki sistemin durumu şu:
+        // Message 1 → [NodeA, NodeB]
+        // Message 2 → [NodeA]
+        // Message 3 → [NodeB, NodeC]
+        // Bu şunu yapar:
+        // Önce [A, B]
+        // Sonra [A]
+        // Sonra [B, C]
+        // Yani mesaj mesaj geziyoruz.
+        for (List<NodeInfo> nodes : data.values()) {
+
+            // Bir mesajın tutulduğu her node için
+            for (NodeInfo node : nodes) {
+
+                // Node'u benzersiz tanımlamak için "host:port" formatı
+                // NodeA → "127.0.0.1:5555"
+                // NodeB → "127.0.0.1:5556"
+                // NodeC → "127.0.0.1:5557"
+                String key = node.getHost() + ":" + node.getPort();
+
+                // O node için mesaj sayısını 1 artır
+                // Yoksa 0'dan başlat
+>>>>>>> main
                 nodeCounts.put(key, nodeCounts.getOrDefault(key, 0) + 1);
             }
         }
 
+<<<<<<< HEAD
         StringBuilder sb = new StringBuilder();
         sb.append("\n=== LOAD BALANCING STATS ===\n");
         sb.append("Total Messages Stored: ").append(data.size()).append("\n");
@@ -518,3 +683,163 @@ public class NodeMain {
         return sb.toString();
     }
 }
+=======
+        // =====================================================
+        // 2) RAPOR METNİNİ OLUŞTUR
+        // =====================================================
+        StringBuilder sb = new StringBuilder();
+
+        // Başlık
+        sb.append("\n=== MESAJ DAĞILIMLARI ===\n");
+
+        // Sistemde toplam kaç farklı mesaj var
+        sb.append("Toplam Kaydedilen Mesajlar: ")
+                .append(data.size())
+                .append("\n");
+
+        // =====================================================
+        // 3) TÜM AİLE ÜYELERİNİ LİSTELE
+        // =====================================================
+        // Registry'deki (bildiğimiz) tüm node'ları alıyoruz
+        List<NodeInfo> allMembers = new ArrayList<>(registry.snapshot());
+
+        // Port numarasına göre sıralıyoruz
+        // (çıktı düzenli ve okunabilir olsun diye)
+        allMembers.sort(Comparator.comparingInt(NodeInfo::getPort));
+
+        // =====================================================
+        // 4) HER NODE İÇİN KAÇ MESAJ VAR YAZ
+        // =====================================================
+        for (NodeInfo member : allMembers) {
+
+            // Aynı "host:port" key formatı
+            String key = member.getHost() + ":" + member.getPort();
+
+            // Eğer bu node'da hiç mesaj yoksa 0 yaz
+            int count = nodeCounts.getOrDefault(key, 0);
+
+            // Satır satır rapora ekle
+            sb.append(String.format(
+                    "Node %s -> %d mesaj\n",
+                    key,
+                    count));
+        }
+        sb.append("============================\n");
+
+        // =====================================================
+        // 5) OLUŞAN RAPORU STRING OLARAK DÖN
+        // =====================================================
+
+        return sb.toString();
+    }
+
+    // ============================================================
+    // Leader'dan "boş port" istemek için helper metot
+    // ============================================================
+    // Bu metot FOLLOWER (lider olmayan node) tarafından çağrılır.
+    //
+    // Mantık:
+    // 1) Leader'a gRPC ile bağlanır (leaderHost:leaderPort).
+    // 2) join RPC'sini "port=0" ile çağırır.
+    // - port=0 demek: "Ben daha port seçmedim, bana bir port ATA" isteği.
+    // 3) Leader FamilyView döner ve içine assignedPort koyar.
+    // 4) Biz de o assignedPort'u alıp geri döndürürüz.
+    //
+    // ÖNEMLİ:
+    // - Bu metot "port taraması" yapmaz.
+    // - Sadece leader'ın kendi tuttuğu state'e göre önerdiği portu alır.
+    // - Port gerçekten boş mu dolu mu, follower node gRPC server'ı başlatırken
+    // anlaşılır.
+    // ============================================================
+    private static int requestPortFromLeader(String leaderHost, int leaderPort, String myHost) {
+
+        // ------------------------------------------------------------
+        // 1) Leader'a gRPC channel aç
+        // ------------------------------------------------------------
+        // ManagedChannel = gRPC'nin TCP bağlantı nesnesi gibi düşünebilirsin.
+        // Biz leader'a bağlanmak için bunu kullanıyoruz.
+        ManagedChannel channel = ManagedChannelBuilder
+                .forAddress(leaderHost, leaderPort) // Leader'ın host:port'u (örn 127.0.0.1:5555)
+                .usePlaintext() // TLS yok -> local test için düz bağlantı
+                .build();
+
+        // ------------------------------------------------------------
+        // 2) Leader'ın FamilyService'ine çağrı yapacak stub oluştur
+        // ------------------------------------------------------------
+        // BlockingStub = çağrı bitene kadar buradaki thread bekler.
+        // join() çağrısı bitince sonuç döner.
+        FamilyServiceGrpc.FamilyServiceBlockingStub stub = FamilyServiceGrpc.newBlockingStub(channel);
+
+        // ------------------------------------------------------------
+        // 3) join isteği için NodeInfo request hazırla
+        // ------------------------------------------------------------
+        // Kritik kural:
+        // request.port == 0 => "Ben port istemeye geldim"
+        //
+        // myHost:
+        // Bu follower node'un kendi host'u (örn 127.0.0.1)
+        //
+        // ready=false:
+        // Çünkü henüz gRPC server'ı o portta AÇMADIK.
+        // Yani "hazırım" değiliz. Sadece port istiyoruz.
+        NodeInfo request = NodeInfo.newBuilder()
+                .setHost(myHost) // Benim hostum
+                .setPort(0) // PORT İSTE modunu tetikler (leader bunu görünce allocatePort yapar)
+                .setReady(false) // Henüz server açılmadı -> ready değil
+                .build();
+
+        // ------------------------------------------------------------
+        // 4) Leader'a join çağrısını gönder
+        // ------------------------------------------------------------
+        // Leader tarafında FamilyServiceImpl.join(request) çalışır.
+        // Eğer request.port == 0 ise:
+        // - leader allocatePort(host) ile bir port seçer
+        // - FamilyView içine assignedPort koyar
+        // - registry'ye pending (ready=false) olarak ekler
+        FamilyView view = stub.join(request);
+
+        // ------------------------------------------------------------
+        // 5) Channel'ı kapat
+        // ------------------------------------------------------------
+        // Açılan bağlantıyı mutlaka kapatıyoruz yoksa connection leak olur.
+        channel.shutdownNow();
+
+        // ------------------------------------------------------------
+        // 6) Leader'ın verdiği portu dön
+        // ------------------------------------------------------------
+        // view.getAssignedPort():
+        // Leader'ın "sana önerdiğim port" dediği sayı.
+        // Bu portu follower node alıp kendi gRPC server'ını o portta başlatacak.
+        return view.getAssignedPort();
+    }
+
+    // ============================================================
+    // Leader'a "ben server'ı açtım, artık hazırım" bildirir
+    // ============================================================
+    private static void notifyReadyToLeader(String leaderHost, int leaderPort, String myHost, int myPort) {
+
+        ManagedChannel channel = ManagedChannelBuilder
+                .forAddress(leaderHost, leaderPort)
+                .usePlaintext()
+                .build();
+
+        try {
+            FamilyServiceGrpc.FamilyServiceBlockingStub stub = FamilyServiceGrpc.newBlockingStub(channel);
+
+            // port != 0 ve ready=true -> Leader bunu "ready bildirimi" kabul eder
+            NodeInfo readyReq = NodeInfo.newBuilder()
+                    .setHost(myHost)
+                    .setPort(myPort)
+                    .setReady(true)
+                    .build();
+
+            // Leader join() içinde upsert yapacak
+            stub.join(readyReq);
+
+        } finally {
+            channel.shutdownNow();
+        }
+    }
+
+}
+>>>>>>> main

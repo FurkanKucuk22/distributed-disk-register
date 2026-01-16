@@ -9,10 +9,18 @@ option java_outer_classname = "FamilyProto";
 message NodeInfo {
   string host = 1;
   int32 port = 2;
+<<<<<<< HEAD
+=======
+  bool ready = 3;
+>>>>>>> main
 }
 
 message FamilyView {
   repeated NodeInfo members = 1;
+<<<<<<< HEAD
+=======
+  int32 assignedPort = 2; 
+>>>>>>> main
 }
 
 message Empty {}

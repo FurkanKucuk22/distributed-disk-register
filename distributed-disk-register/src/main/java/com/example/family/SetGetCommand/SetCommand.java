@@ -23,6 +23,10 @@ public class SetCommand implements Command {
     }
     // --------------------------------
 
+<<<<<<< HEAD
+=======
+    // Burada rame yazma işlemi yapılır
+>>>>>>> main
     @Override
     public String execute(DataStore store) {
         return store.set(message.getId(), message.getText());
