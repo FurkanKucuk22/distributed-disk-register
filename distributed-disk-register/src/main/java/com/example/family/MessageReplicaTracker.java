@@ -114,7 +114,6 @@ public class MessageReplicaTracker {
     // =====================================================
     // DEBUG / LOG AMAÇLI İSTATİSTİK
     // =====================================================
->>>>>>> main
     public void printStats() {
         System.out.println("=== Message Replica Stats ===");
         System.out.println("Total messages tracked: " + messageToMembers.size());
@@ -122,12 +121,6 @@ public class MessageReplicaTracker {
             System.out.printf("Message %d -> %d replicas%n", id, members.size());
         });
     }
-<<<<<<< HEAD
-    public Map<Integer, List<NodeInfo>> getSnapshot() {
-        // Orijinal map bozulmasın diye salt okunur veya kopya döndürüyoruz
-        return Collections.unmodifiableMap(messageToMembers);
-    }
-=======
 
     // =====================================================
     // SADECE OKUNUR SNAPSHOT
@@ -145,5 +138,4 @@ public class MessageReplicaTracker {
     //
     // Çünkü artık "distribution.log" kullanılmayacak,
     // uygulama kapanıp açılınca replikasyon bilgisi sıfırdan başlayacak.
->>>>>>> main
 }
