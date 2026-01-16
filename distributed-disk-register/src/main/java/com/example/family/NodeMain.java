@@ -278,16 +278,16 @@ public class NodeMain {
         }
     }
 
-    private static void startFamilyPrinter(NodeRegistry registry, NodeInfo self) {
+private static void startFamilyPrinter(NodeRegistry registry, NodeInfo self) {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
         scheduler.scheduleAtFixedRate(() -> {
             List<NodeInfo> members = registry.snapshot();
             System.out.println("======================================");
-            System.out.printf("Family at %s:%d (me)%n", self.getHost(), self.getPort());
+            System.out.printf("Node Status [%s:%d]%n", self.getHost(), self.getPort());
             System.out.println("Time: " + LocalDateTime.now());
-            System.out.println("Members:");
 
+            System.out.println("Family Members:");
             for (NodeInfo n : members) {
                 boolean isMe = n.getHost().equals(self.getHost()) && n.getPort() == self.getPort();
                 System.out.printf(" - %s:%d%s%n",
@@ -295,7 +295,14 @@ public class NodeMain {
                         n.getPort(),
                         isMe ? " (me)" : "");
             }
-            System.out.println("======================================");
+
+            // Lider, periyodik olarak sistemde toplam kaç mesaj saklandığını bastırmalıdır.
+            if (self.getPort() == START_PORT) {
+                System.out.println("\n--- LEADER REPORT ---");
+                // Mevcut calculateLoadStats metodunu kullanarak genel durumu basıyoruz
+                System.out.print(calculateLoadStats(registry));
+            }
+
         }, 3, PRINT_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
