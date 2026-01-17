@@ -109,9 +109,6 @@ private void writeMessageToDisk(int id, String msg) {
         // Bu işlem işletim sistemi seviyesinde diske asenkron olarak yansıtılır.
         buffer.put(data);
 
-        // İsteğe bağlı: buffer.force(); 
-        // Verinin fiziksel diske yazıldığını garanti etmek için kullanılabilir 
-
     } catch (IOException e) {
         System.err.println("Zero-Copy yazma hatası: " + e.getMessage());
     }

@@ -47,9 +47,6 @@ public class MessageReplicaTracker {
     // Eskiden burada diskten log okuyup RAM'e yüklüyorduk.
     // Artık KESİNLİKLE diskten yükleme istemiyoruz.
     // Bu yüzden constructor boş kalıyor.
-    public MessageReplicaTracker() {
-        // loadTrackerFromDisk();  // ❌ ARTIK YOK: diskten yükleme yapılmasın
-    }
     
     // =====================================================
     // DEBUG / LOG AMAÇLI İSTATİSTİK

@@ -44,27 +44,29 @@ import io.grpc.ServerBuilder;
 public class NodeMain {
     private static final int START_PORT = 5555;
     private static final int PRINT_INTERVAL_SECONDS = 10;
+    private static final String LEADER_HOST = "172.20.54.254";
+    private static final int LEADER_PORT = 5555;
     // STORE Removed
     private static final MessageReplicaTracker REPLICA_TRACKER = new MessageReplicaTracker();
 
     public static void main(String[] args) throws Exception {
         ToleranceConfig.loadConfig();
-        String leaderHost = "192.168.1.172";
-        int leaderPort = 5555;
+        String LEADER_HOST = "172.20.54.254";
+        int LEADER_PORT = 5555;
 
         String host = getMyLanIp();
         System.out.println("MY HOST = " + host);
-        System.out.println("LEADER  = " + leaderHost + ":" + leaderPort);
+        System.out.println("LEADER  = " + LEADER_HOST + ":" + LEADER_PORT);
 
         int port;
 
-        if (host.equals(leaderHost) && canBindPort(leaderPort)) {
-            port = leaderPort;
+        if (host.equals(LEADER_HOST) && canBindPort(LEADER_PORT)) {
+            port = LEADER_PORT;
             System.out.println("LEADER (bound 5555)");
         } else {
             // follower: port iste + yerelde doluysa tekrar iste
             while (true) {
-                port = requestPortFromLeader(leaderHost, leaderPort, host);
+                port = requestPortFromLeader(LEADER_HOST, LEADER_PORT, host);
                 if (canBindPort(port))
                     break;
                 System.out.println("Port " + port + " is busy locally, asking again...");
@@ -92,10 +94,12 @@ public class NodeMain {
         if (port == START_PORT) {
             startLeaderTextListener(registry, self);
         } else {
-            notifyReadyToLeader(leaderHost, leaderPort, host, port);
+            notifyReadyToLeader(LEADER_HOST, LEADER_PORT, host, port);
         }
 
-        discoverFamilyFromLeader(leaderHost, leaderPort, registry);
+        discoverFamilyFromLeader(LEADER_HOST, LEADER_PORT, registry);
+        
+        startFamilyRefresher(registry, self);
         startFamilyPrinter(registry, self);
         startHealthChecker(registry, self);
 
@@ -250,13 +254,13 @@ public class NodeMain {
         }
     }
 
-    private static void discoverFamilyFromLeader(String leaderHost, int leaderPort,
+    private static void discoverFamilyFromLeader(String LEADER_HOST, int LEADER_PORT,
             NodeRegistry registry) {
 
         ManagedChannel channel = null;
         try {
             channel = ManagedChannelBuilder
-                    .forAddress(leaderHost, leaderPort)
+                    .forAddress(LEADER_HOST, LEADER_PORT)
                     .usePlaintext()
                     .build();
 
@@ -270,15 +274,13 @@ public class NodeMain {
                 registry.upsert(n);
             }
 
-            System.out.println("Family pulled from leader. size=" + registry.snapshot().size());
-
         } finally {
             if (channel != null)
                 channel.shutdownNow();
         }
     }
 
-private static void startFamilyPrinter(NodeRegistry registry, NodeInfo self) {
+    private static void startFamilyPrinter(NodeRegistry registry, NodeInfo self) {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
         scheduler.scheduleAtFixedRate(() -> {
@@ -525,10 +527,10 @@ private static void startFamilyPrinter(NodeRegistry registry, NodeInfo self) {
         return sb.toString();
     }
 
-    private static int requestPortFromLeader(String leaderHost, int leaderPort, String myHost) {
+    private static int requestPortFromLeader(String LEADER_HOST, int LEADER_PORT, String myHost) {
 
         ManagedChannel channel = ManagedChannelBuilder
-                .forAddress(leaderHost, leaderPort)
+                .forAddress(LEADER_HOST, LEADER_PORT)
                 .usePlaintext()
                 .build();
 
@@ -547,10 +549,10 @@ private static void startFamilyPrinter(NodeRegistry registry, NodeInfo self) {
         return view.getAssignedPort();
     }
 
-    private static void notifyReadyToLeader(String leaderHost, int leaderPort, String myHost, int myPort) {
+    private static void notifyReadyToLeader(String LEADER_HOST, int LEADER_PORT, String myHost, int myPort) {
 
         ManagedChannel channel = ManagedChannelBuilder
-                .forAddress(leaderHost, leaderPort)
+                .forAddress(LEADER_HOST, LEADER_PORT)
                 .usePlaintext()
                 .build();
 
@@ -603,4 +605,22 @@ private static void startFamilyPrinter(NodeRegistry registry, NodeInfo self) {
         return "127.0.0.1";
     }
 
+    // ✅ EKLENDİ: Üyeler leader'dan family listesini periyodik çeker (registry
+    // güncellenir)
+    private static void startFamilyRefresher(NodeRegistry registry, NodeInfo self) {
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                // Leader da çekebilir, zararı yok; ama asıl amaç followerların güncellenmesi
+                discoverFamilyFromLeader(LEADER_HOST, LEADER_PORT, registry);
+
+                // Kendini kaybetme ihtimaline karşı garanti:
+                registry.upsert(self);
+
+            } catch (Exception e) {
+                System.err.println("[REFRESH] Family refresh failed: " + e.getMessage());
+            }
+        }, 5, 2, TimeUnit.SECONDS); // 2 sn’de bir güncelle (istersen 5 yaparız)
+    }
 }
