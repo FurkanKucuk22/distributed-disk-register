@@ -51,8 +51,6 @@ public class NodeMain {
 
     public static void main(String[] args) throws Exception {
         ToleranceConfig.loadConfig();
-        String LEADER_HOST = "172.20.54.254";
-        int LEADER_PORT = 5555;
 
         String host = getMyLanIp();
         System.out.println("MY HOST = " + host);
