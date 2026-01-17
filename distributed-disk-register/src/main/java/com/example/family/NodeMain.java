@@ -377,6 +377,7 @@ public class NodeMain {
         List<NodeInfo> selectedMembers = router.getPreferenceList(String.valueOf(messageId), tolerance);
 
         // 4. ADIM: Seçilen üyelere gönder
+        int requiredReplicas = selectedMembers.size();
         int successCount = 0;
         for (NodeInfo member : selectedMembers) {
             ManagedChannel channel = null;
@@ -412,7 +413,7 @@ public class NodeMain {
             }
         }
 
-        if (successCount >= 1) { // En az 1 yere bile gitse OK sayabiliriz (tasarım tercihi)
+        if (successCount >= requiredReplicas) { // En az 1 yere bile gitse OK sayabiliriz (tasarım tercihi)
             return "OK";
         } else {
             return "ERROR: Replication failed";

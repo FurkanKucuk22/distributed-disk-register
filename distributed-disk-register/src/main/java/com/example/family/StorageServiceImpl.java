@@ -72,7 +72,7 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
 
     // 3. Bulunan değeri Protobuf mesajına paketle
     if (foundValue == null) {
-      foundValue = "NOT_FOUND";
+      foundValue = "";
     }
 
     StoredMessage response = StoredMessage.newBuilder()
